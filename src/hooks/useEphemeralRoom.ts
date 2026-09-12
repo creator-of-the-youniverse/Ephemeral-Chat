@@ -26,6 +26,48 @@ async function decryptSingleMessage(msg: Message, key: CryptoKey | null): Promis
   }
 }
 
+/**
+ * Safely parse API responses, preventing "Unexpected token 'T'... is not valid JSON"
+ * if the server returns HTML (e.g. 404, 502, proxy warmup, etc.)
+ */
+async function parseJsonResponse<T = any>(res: Response, fallbackErrMsg = 'Server error'): Promise<T> {
+  const contentType = res.headers.get('content-type') || '';
+  let data: any = null;
+
+  if (contentType.includes('application/json')) {
+    try {
+      data = await res.json();
+    } catch {
+      data = null;
+    }
+  }
+
+  if (!res.ok) {
+    if (data && (data.error || data.message)) {
+      throw new Error(data.error || data.message);
+    }
+    const rawText = !data ? (await res.text().catch(() => '')).trim() : '';
+    if (rawText.startsWith('<') || rawText.toLowerCase().includes('the page')) {
+      throw new Error(`Unable to reach chat server (${res.status}). Please check your connection or reload.`);
+    }
+    throw new Error(rawText.slice(0, 100) || `${fallbackErrMsg} (HTTP ${res.status})`);
+  }
+
+  if (data === null) {
+    try {
+      const rawText = (await res.text()).trim();
+      if (rawText.startsWith('<') || rawText.toLowerCase().includes('the page')) {
+        throw new Error(`Unexpected response from server (HTTP ${res.status}).`);
+      }
+      throw new Error(`Invalid server response: ${rawText.slice(0, 60)}`);
+    } catch (err: any) {
+      throw new Error(err.message || 'Invalid server response.');
+    }
+  }
+
+  return data as T;
+}
+
 export function useEphemeralRoom() {
   const [roomId, setRoomId] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
@@ -318,7 +360,7 @@ export function useEphemeralRoom() {
       fetch(`/api/rooms/${urlRoomId}`, {
         headers: { Authorization: `Bearer ${existingSession.token}` },
       })
-        .then((res) => res.json())
+        .then((res) => parseJsonResponse(res, 'Session verification failed'))
         .then(async (data) => {
           if (data.exists && data.room) {
             const key = await getDerivedRoomKey(urlRoomId);
@@ -342,7 +384,7 @@ export function useEphemeralRoom() {
     } else {
       // Arrived via invitation link as guest
       fetch(`/api/rooms/${urlRoomId}`)
-        .then((res) => res.json())
+        .then((res) => parseJsonResponse(res, 'Room query failed'))
         .then((data) => {
           if (!data.exists) {
             setError('This private room no longer exists.');
@@ -368,8 +410,8 @@ export function useEphemeralRoom() {
             });
           }
         })
-        .catch(() => {
-          setError('Unable to reach the private room server.');
+        .catch((err) => {
+          setError(err.message || 'Unable to reach the private room server.');
         });
     }
 
@@ -391,12 +433,7 @@ export function useEphemeralRoom() {
         body: JSON.stringify({ hostName }),
       });
 
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to create private room.');
-      }
-
-      const data = await res.json();
+      const data = await parseJsonResponse(res, 'Failed to create private room');
       const newRoomId = data.roomId;
       const newHostToken = data.hostToken;
 
@@ -437,12 +474,7 @@ export function useEphemeralRoom() {
         body: JSON.stringify({ guestName }),
       });
 
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to knock on the door.');
-      }
-
-      const data = await res.json();
+      const data = await parseJsonResponse(res, 'Failed to knock on the door');
       const newGuestToken = data.guestToken;
 
       setToken(newGuestToken);
@@ -474,10 +506,7 @@ export function useEphemeralRoom() {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to open door.');
-      }
+      await parseJsonResponse(res, 'Failed to open door');
 
       setStatus('ACTIVE');
       setGuestKnocked(null);
@@ -541,10 +570,7 @@ export function useEphemeralRoom() {
           },
           body: JSON.stringify(payload),
         });
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || 'Failed to send message.');
-        }
+        await parseJsonResponse(res, 'Failed to send message');
       } catch (err: any) {
         setError(err.message || 'Failed to send message.');
       }
@@ -597,10 +623,7 @@ export function useEphemeralRoom() {
           },
           body: JSON.stringify(payload),
         });
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || 'Failed to send image.');
-        }
+        await parseJsonResponse(res, 'Failed to send image');
       } catch (err: any) {
         setError(err.message || 'Failed to send image.');
       }
@@ -637,7 +660,7 @@ export function useEphemeralRoom() {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      const data = await res.json();
+      const data = await parseJsonResponse(res, 'Failed to end chat');
 
       if (data.destroyed) {
         // Both participants have ended -> Permanent destruction

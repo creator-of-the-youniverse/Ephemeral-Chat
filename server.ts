@@ -1,14 +1,14 @@
 // Clean up invalid globalThis.__dirname injected into the Node runtime environment
-if (typeof (globalThis as any).__dirname === 'string' && (globalThis as any).__dirname === '.') {
-  delete (globalThis as any).__dirname;
+if (typeof Reflect.get(globalThis, '__dirname') === 'string' && Reflect.get(globalThis, '__dirname') === '.') {
+  Reflect.deleteProperty(globalThis, '__dirname');
 }
 
 import express from 'express';
 import http from 'http';
 import path from 'path';
+import fs from 'fs';
 import crypto from 'crypto';
 import { WebSocketServer, WebSocket } from 'ws';
-import { createServer as createViteServer } from 'vite';
 
 export interface Message {
   id: string;
@@ -697,8 +697,33 @@ async function startServer() {
     });
   });
 
-  // Vite middleware setup
-  if (process.env.NODE_ENV !== 'production') {
+  // API 404 handler for unmatched API routes - ALWAYS return JSON, never HTML
+  app.all('/api/*', (req, res) => {
+    res.status(404).json({ error: `API route not found: ${req.method} ${req.path}` });
+  });
+
+  // Global error handler for API requests
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error('Server error:', err);
+    if (res.headersSent) {
+      return next(err);
+    }
+    if (req.path.startsWith('/api')) {
+      return res.status(err.status || 500).json({
+        error: err.message || 'Internal server error',
+      });
+    }
+    next(err);
+  });
+
+  // Client SPA serving and Vite middleware setup
+  const distPath = path.resolve(process.cwd(), 'dist');
+  const indexHtmlPath = path.join(distPath, 'index.html');
+  const hasDist = fs.existsSync(indexHtmlPath);
+  const isDev = process.env.NODE_ENV !== 'production' && !hasDist;
+
+  if (isDev) {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: {
         middlewareMode: true,
@@ -708,11 +733,19 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
+    if (hasDist) {
+      app.use(express.static(distPath));
+      app.get('*', (req, res, next) => {
+        if (req.path.startsWith('/api') || req.path.startsWith('/ws')) {
+          return next();
+        }
+        res.sendFile(indexHtmlPath);
+      });
+    } else {
+      app.get('*', (req, res) => {
+        res.status(503).send('Application build in progress. Please refresh momentarily.');
+      });
+    }
   }
 
   server.listen(PORT, '0.0.0.0', () => {
