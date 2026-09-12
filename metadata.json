@@ -1,0 +1,10 @@
+{
+  "name": "Private Ephemeral Chat",
+  "description": "A private, temporary, two-person PWA chat with knock-to-enter waiting room, ephemeral messaging, encrypted temporary camera photos, and mutual end-chat destruction.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
