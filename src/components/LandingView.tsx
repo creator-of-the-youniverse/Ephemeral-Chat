@@ -12,6 +12,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onCreateRoom, isLoadin
   const [hostName, setHostName] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [showOnboarding, setShowOnboarding] = useState(() => localStorage.getItem('privchat_onboarding_seen') !== 'true');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,7 +30,10 @@ export const LandingView: React.FC<LandingViewProps> = ({ onCreateRoom, isLoadin
     }
   };
 
+  const closeOnboarding = () => { localStorage.setItem("privchat_onboarding_seen", "true"); setShowOnboarding(false); };
   return (
+    <>
+    {showOnboarding && <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"><div className="w-full max-w-sm rounded-2xl bg-zinc-900 border border-zinc-700 p-6 shadow-2xl text-left"><h2 className="text-xl font-semibold text-zinc-100 mb-2">Welcome to PrivChat</h2><p className="text-sm text-zinc-400 mb-4">Private, temporary chat for two people. No account. No chat history.</p><div className="space-y-2 text-sm text-zinc-300 mb-5"><p>1. Create a room and share the private link.</p><p>2. Your guest enters their name and knocks.</p><p>3. Open the door and chat.</p><p>4. When both end the chat, the conversation is destroyed.</p></div><div className="rounded-xl bg-zinc-950 border border-zinc-800 p-3 text-xs text-zinc-400 mb-5"><span className="font-semibold text-zinc-200">Install PrivChat:</span> Android/Chrome: use the browser install prompt or menu. iPhone/iPad: Safari → Share → Add to Home Screen. Desktop: use the install icon/menu when available.</div><button onClick={closeOnboarding} className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-semibold text-sm">Got it</button></div></div>}
     <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 max-w-lg mx-auto w-full text-center my-auto">
       {/* Visual Door Emblem */}
       <div className="relative mb-6">
@@ -156,5 +160,6 @@ export const LandingView: React.FC<LandingViewProps> = ({ onCreateRoom, isLoadin
         </form>
       )}
     </div>
+    </>
   );
 };
