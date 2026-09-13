@@ -26,8 +26,8 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
     if (navigator.share) {
       try {
         await navigator.share({
-          title: 'Join my private chat room',
-          text: 'Private ephemeral conversation room. Knock to enter.',
+          title: 'Private Chat Invitation',
+          text: 'You’ve been invited to a private, temporary chat. Open the link and knock to enter.',
           url: inviteUrl,
         });
       } catch {
@@ -105,7 +105,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
               Your private room is ready
             </h2>
             <p className="text-sm text-zinc-400">
-              Invite someone to join your private conversation.
+              Send someone your private invitation. They’ll knock before they can enter.
             </p>
           </div>
 
@@ -116,7 +116,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
               className="w-full py-3.5 px-6 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-semibold text-sm sm:text-base transition duration-150 flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-[0.99] cursor-pointer"
             >
               <Share2 className="w-4 h-4" />
-              <span>Share Private Invite</span>
+              <span>Send Private Invite</span>
             </button>
 
             <button
@@ -131,7 +131,7 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
               ) : (
                 <>
                   <Copy className="w-4 h-4 text-zinc-400" />
-                  <span>Copy Link</span>
+                  <span>Copy Private Invite</span>
                 </>
               )}
             </button>
@@ -140,17 +140,17 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
           {/* URL Box */}
           <div className="p-3 rounded-xl bg-zinc-900/60 border border-zinc-800/80 text-left">
             <span className="block text-[11px] uppercase font-mono text-zinc-500 tracking-wider mb-1">
-              Temporary Room Link
+              Private Invitation
             </span>
             <span className="font-mono text-xs text-zinc-300 break-all select-all">
-              {inviteUrl}
+              {window.location.host}/chat/{roomId}
             </span>
           </div>
 
           {/* Ambient Waiting Indicator */}
           <div className="pt-2 flex items-center justify-center gap-2 text-xs text-zinc-500">
             <span className="w-2 h-2 rounded-full bg-emerald-500/50 animate-pulse" />
-            <span>Waiting for the other person to knock...</span>
+            <span>Waiting for your guest to knock...</span>
           </div>
         </div>
       )}
