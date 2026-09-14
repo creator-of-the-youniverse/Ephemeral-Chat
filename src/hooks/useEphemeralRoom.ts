@@ -412,6 +412,7 @@ export function useEphemeralRoom() {
         })
         .catch((err) => {
           setError(err.message || 'Unable to reach the private room server.');
+          setStatus('DESTROYED');
         });
     }
 
