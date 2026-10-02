@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { DoorClosed, Shield, User, ArrowRight, Sparkles, Key, Zap } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { DoorClosed, Shield, User, ArrowRight, Key } from 'lucide-react';
+import { announce } from '../lib/announcer';
 
 interface LandingViewProps {
   onCreateRoom: (hostName: string) => Promise<string>;
@@ -13,6 +14,18 @@ export const LandingView: React.FC<LandingViewProps> = ({ onCreateRoom, isLoadin
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(() => localStorage.getItem('privchat_onboarding_seen') !== 'true');
+
+  useEffect(() => {
+    announce(
+      'Welcome to Private Ephemeral Chat. A temporary, encrypted room for two. Press Alt plus A anytime for accessibility guide and shortcuts.',
+      'polite'
+    );
+  }, []);
+
+  const handleGoToName = () => {
+    setStep('name');
+    announce('Choose your display name for the private room.', 'polite');
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,11 +99,12 @@ export const LandingView: React.FC<LandingViewProps> = ({ onCreateRoom, isLoadin
           {/* Primary Action Button */}
           <div className="pt-2">
             <button
-              onClick={() => setStep('name')}
-              className="w-full py-3.5 px-6 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-semibold text-sm sm:text-base transition duration-150 flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-[0.99] cursor-pointer"
+              onClick={handleGoToName}
+              className="w-full py-3.5 px-6 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-semibold text-sm sm:text-base transition duration-150 flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-[0.99] cursor-pointer focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:outline-none"
+              aria-label="Open a private chat room"
             >
               <span>Open a Private Chat</span>
-              <ArrowRight className="w-4 h-4" />
+              <ArrowRight className="w-4 h-4" aria-hidden="true" />
             </button>
           </div>
         </div>
@@ -99,19 +113,19 @@ export const LandingView: React.FC<LandingViewProps> = ({ onCreateRoom, isLoadin
         <form onSubmit={handleSubmit} className="w-full space-y-5 animate-fade-in text-left">
           <div className="text-center space-y-1.5">
             <h2 className="text-xl sm:text-2xl font-semibold text-zinc-100">
-              Choose your name
+              Choose your display name
             </h2>
             <p className="text-xs sm:text-sm text-zinc-400">
-              This is the name the other person will see.
+              This is the name the other participant will see and hear announced.
             </p>
           </div>
 
           <div className="space-y-2">
             <label htmlFor="hostNameInput" className="block text-xs font-medium text-zinc-300">
-              Your name
+              Your name:
             </label>
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-500">
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-zinc-500" aria-hidden="true">
                 <User className="w-4 h-4" />
               </div>
               <input
@@ -121,14 +135,16 @@ export const LandingView: React.FC<LandingViewProps> = ({ onCreateRoom, isLoadin
                 onChange={(e) => setHostName(e.target.value)}
                 placeholder="e.g. Alex"
                 maxLength={25}
+                required
+                aria-required="true"
                 autoFocus
-                className="w-full pl-10 pr-4 py-3 rounded-xl bg-zinc-900 border border-zinc-700/80 text-zinc-100 placeholder-zinc-500 text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
+                className="w-full pl-10 pr-4 py-3 rounded-xl bg-zinc-900 border border-zinc-700/80 text-zinc-100 placeholder-zinc-500 text-sm focus:outline-none focus:border-emerald-500 focus-visible:ring-2 focus-visible:ring-emerald-400 transition"
               />
             </div>
           </div>
 
           {(formError || error) && (
-            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs">
+            <div role="alert" className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs">
               {formError || error}
             </div>
           )}
@@ -137,14 +153,15 @@ export const LandingView: React.FC<LandingViewProps> = ({ onCreateRoom, isLoadin
             <button
               type="submit"
               disabled={submitting || isLoading || !hostName.trim()}
-              className="w-full py-3.5 px-6 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-zinc-950 font-semibold text-sm sm:text-base transition duration-150 flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-[0.99] cursor-pointer"
+              className="w-full py-3.5 px-6 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-zinc-950 font-semibold text-sm sm:text-base transition duration-150 flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-[0.99] cursor-pointer focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:outline-none"
+              aria-label="Enter Private Room"
             >
               {submitting || isLoading ? (
                 <span>Opening room...</span>
               ) : (
                 <>
                   <span>Enter Private Room</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <ArrowRight className="w-4 h-4" aria-hidden="true" />
                 </>
               )}
             </button>
@@ -152,9 +169,9 @@ export const LandingView: React.FC<LandingViewProps> = ({ onCreateRoom, isLoadin
             <button
               type="button"
               onClick={() => setStep('intro')}
-              className="w-full py-2.5 text-xs text-zinc-400 hover:text-zinc-200 transition"
+              className="w-full py-2.5 text-xs text-zinc-400 hover:text-zinc-200 transition focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:outline-none rounded-lg"
             >
-              Back
+              Back to overview
             </button>
           </div>
         </form>

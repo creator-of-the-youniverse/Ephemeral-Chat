@@ -38,3 +38,155 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #3f3f46;
 }
+
+/* ==========================================================================
+   High Contrast Mode: Pure White (#ffffff) on Deep Black (#000000)
+   with thicker 2px solid white borders and bold clear UI elements
+   ========================================================================== */
+html.high-contrast,
+html.high-contrast body,
+html.high-contrast #root,
+html.high-contrast main {
+  background-color: #000000 !important;
+  color: #ffffff !important;
+}
+
+/* High contrast background overrides */
+html.high-contrast .bg-zinc-950,
+html.high-contrast .bg-zinc-900,
+html.high-contrast .bg-zinc-800,
+html.high-contrast .bg-zinc-700,
+html.high-contrast .bg-black\/80,
+html.high-contrast .bg-black\/70,
+html.high-contrast .bg-zinc-950\/90,
+html.high-contrast .bg-zinc-900\/60,
+html.high-contrast .bg-zinc-900\/80,
+html.high-contrast .bg-zinc-950\/60 {
+  background-color: #000000 !important;
+}
+
+/* High contrast text overrides */
+html.high-contrast .text-zinc-500,
+html.high-contrast .text-zinc-400,
+html.high-contrast .text-zinc-300,
+html.high-contrast .text-zinc-200,
+html.high-contrast .text-zinc-100 {
+  color: #ffffff !important;
+}
+
+/* High contrast borders: 2px solid pure white */
+html.high-contrast .border,
+html.high-contrast .border-zinc-800,
+html.high-contrast .border-zinc-700,
+html.high-contrast .border-zinc-600,
+html.high-contrast .border-zinc-900,
+html.high-contrast [class*="border-zinc-"] {
+  border-color: #ffffff !important;
+  border-width: 2px !important;
+}
+
+/* Modal and dialog cards */
+html.high-contrast [role="dialog"],
+html.high-contrast .rounded-2xl,
+html.high-contrast .rounded-xl {
+  border-color: #ffffff !important;
+}
+
+html.high-contrast [role="dialog"] {
+  background-color: #000000 !important;
+  border: 2px solid #ffffff !important;
+  box-shadow: 0 0 0 2px #ffffff !important;
+}
+
+/* Input fields & Textareas */
+html.high-contrast input,
+html.high-contrast textarea {
+  background-color: #000000 !important;
+  color: #ffffff !important;
+  border: 2px solid #ffffff !important;
+}
+
+html.high-contrast input::placeholder,
+html.high-contrast textarea::placeholder {
+  color: #e4e4e7 !important;
+  opacity: 1 !important;
+}
+
+/* Buttons in High Contrast */
+html.high-contrast button {
+  border-width: 2px !important;
+}
+
+/* Primary action buttons in High Contrast */
+html.high-contrast .bg-emerald-500 {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  border: 2px solid #ffffff !important;
+  font-weight: 700 !important;
+}
+
+html.high-contrast .bg-emerald-500:hover {
+  background-color: #e4e4e7 !important;
+  color: #000000 !important;
+}
+
+/* Secondary / muted buttons */
+html.high-contrast .bg-emerald-500\/10,
+html.high-contrast .bg-emerald-500\/20 {
+  background-color: #000000 !important;
+  border: 2px solid #ffffff !important;
+  color: #ffffff !important;
+}
+
+/* Danger / Destructive buttons */
+html.high-contrast .bg-rose-600,
+html.high-contrast .bg-rose-500,
+html.high-contrast .bg-rose-500\/10,
+html.high-contrast .bg-red-600 {
+  background-color: #000000 !important;
+  border: 2px solid #ff4444 !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+}
+
+/* Toggle Switches */
+html.high-contrast button[role="switch"] {
+  border: 2px solid #ffffff !important;
+  background-color: #000000 !important;
+}
+
+html.high-contrast button[role="switch"][aria-checked="true"] {
+  background-color: #ffffff !important;
+}
+
+html.high-contrast button[role="switch"][aria-checked="true"] span {
+  background-color: #000000 !important;
+}
+
+html.high-contrast button[role="switch"][aria-checked="false"] span {
+  background-color: #ffffff !important;
+}
+
+/* Chat Message Bubbles */
+html.high-contrast .chat-bubble-me,
+html.high-contrast [data-message-sender="host"].is-me,
+html.high-contrast [data-message-sender="guest"].is-me {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  border: 2px solid #ffffff !important;
+  font-weight: 600 !important;
+}
+
+html.high-contrast .chat-bubble-peer,
+html.high-contrast [data-message-sender="host"].is-peer,
+html.high-contrast [data-message-sender="guest"].is-peer {
+  background-color: #000000 !important;
+  color: #ffffff !important;
+  border: 2px solid #ffffff !important;
+}
+
+/* High Contrast Focus rings */
+html.high-contrast *:focus-visible {
+  outline: 3px solid #ffffff !important;
+  outline-offset: 3px !important;
+}

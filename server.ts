@@ -147,7 +147,7 @@ setInterval(() => {
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
 
   app.use(express.json({ limit: '20mb' }));
   app.use(express.urlencoded({ extended: true, limit: '20mb' }));
@@ -200,7 +200,7 @@ async function startServer() {
     const room = rooms.get(roomId);
 
     if (!room) {
-      return res.status(404).json({ exists: false, error: 'This private room no longer exists.' });
+      return res.status(200).json({ exists: false, error: 'This private room no longer exists.' });
     }
 
     const authHeader = req.headers.authorization;
@@ -513,7 +513,22 @@ async function startServer() {
 
   // Create HTTP & WebSocket Server
   const server = http.createServer(app);
-  const wss = new WebSocketServer({ server, path: '/ws' });
+  const wss = new WebSocketServer({ noServer: true });
+
+  server.on('upgrade', (request, socket, head) => {
+    try {
+      const url = new URL(request.url || '', `http://${request.headers.host || 'localhost'}`);
+      if (url.pathname === '/ws') {
+        wss.handleUpgrade(request, socket, head, (ws) => {
+          wss.emit('connection', ws, request);
+        });
+      } else {
+        socket.destroy();
+      }
+    } catch {
+      socket.destroy();
+    }
+  });
 
   wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
     const url = new URL(req.url || '', `http://${req.headers.host || 'localhost'}`);
@@ -717,17 +732,17 @@ async function startServer() {
   });
 
   // Client SPA serving and Vite middleware setup
+  const isProduction = process.env.NODE_ENV === 'production';
   const distPath = path.resolve(process.cwd(), 'dist');
   const indexHtmlPath = path.join(distPath, 'index.html');
   const hasDist = fs.existsSync(indexHtmlPath);
-  const isDev = process.env.NODE_ENV !== 'production' && !hasDist;
 
-  if (isDev) {
+  if (!isProduction) {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: {
         middlewareMode: true,
-        hmr: process.env.DISABLE_HMR === 'true' ? false : { server },
+        hmr: false,
       },
       appType: 'spa',
     });

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useEphemeralRoom } from './hooks/useEphemeralRoom';
 import { Header } from './components/Header';
 import { LandingView } from './components/LandingView';
@@ -13,7 +13,14 @@ import { ChatView } from './components/ChatView';
 import { EndChatModal } from './components/EndChatModal';
 import { DestroyedNotice } from './components/DestroyedNotice';
 import { BiometricLockModal } from './components/BiometricLockModal';
-import { OfflineIndicator } from './components/PWAInstallButton';
+import { AccessibilityModal } from './components/AccessibilityModal';
+import { OfflineIndicator, PWAInstallButton, usePWAInstall } from './components/PWAInstallButton';
+import { isSoundEnabled, setSoundEnabled } from './lib/sound';
+import { isVoicePromptsEnabled, setVoicePromptsEnabled, speakVoicePrompt } from './lib/speech';
+import { isHighContrastEnabled, setHighContrastEnabled } from './lib/highContrast';
+import { isHapticEnabled, setHapticEnabled, triggerHaptic } from './lib/haptic';
+import { announce } from './lib/announcer';
+import { DoorClosed, Eye, Volume2, VolumeX } from 'lucide-react';
 
 export default function App() {
   const {
@@ -41,8 +48,124 @@ export default function App() {
     resetToLanding,
   } = useEphemeralRoom();
 
+  const { install: installPWA } = usePWAInstall();
+
   const [isEndModalOpen, setIsEndModalOpen] = useState(false);
   const [isShieldLocked, setIsShieldLocked] = useState(false);
+  const [isA11yModalOpen, setIsA11yModalOpen] = useState(false);
+  const [soundEnabled, setSoundEnabledState] = useState<boolean>(() => isSoundEnabled());
+  const [voiceEnabled, setVoiceEnabledState] = useState<boolean>(() => isVoicePromptsEnabled());
+  const [highContrastEnabled, setHighContrastEnabledState] = useState<boolean>(() => isHighContrastEnabled());
+  const [hapticEnabled, setHapticEnabledState] = useState<boolean>(() => isHapticEnabled());
+
+  const handleToggleSound = useCallback(() => {
+    setSoundEnabledState((prev) => {
+      const next = !prev;
+      setSoundEnabled(next);
+      announce(
+        next ? 'Auditory sound cues enabled.' : 'Auditory sound cues muted.',
+        'polite'
+      );
+      return next;
+    });
+  }, []);
+
+  const handleToggleVoice = useCallback(() => {
+    setVoiceEnabledState((prev) => {
+      const next = !prev;
+      setVoicePromptsEnabled(next);
+      const msg = next ? 'Accessibility voice prompts enabled.' : 'Accessibility voice prompts muted.';
+      announce(msg, 'polite');
+      if (next) {
+        speakVoicePrompt(msg, { force: true });
+      }
+      return next;
+    });
+  }, []);
+
+  const handleToggleHighContrast = useCallback(() => {
+    setHighContrastEnabledState((prev) => {
+      const next = !prev;
+      setHighContrastEnabled(next);
+      const msg = next
+        ? 'High Contrast mode enabled: pure white text on deep black background with thick borders.'
+        : 'High Contrast mode disabled: default palette restored.';
+      announce(msg, 'polite');
+      speakVoicePrompt(msg);
+      return next;
+    });
+  }, []);
+
+  const handleToggleHaptic = useCallback(() => {
+    setHapticEnabledState((prev) => {
+      const next = !prev;
+      setHapticEnabled(next);
+      if (next) {
+        triggerHaptic([30, 40, 30]);
+      }
+      const msg = next
+        ? 'Tactile haptic feedback enabled.'
+        : 'Tactile haptic feedback disabled.';
+      announce(msg, 'polite');
+      speakVoicePrompt(msg);
+      return next;
+    });
+  }, []);
+
+  // Global Keyboard Shortcuts for complete blind accessibility:
+  // Alt+A: Open Accessibility & Shortcuts Guide
+  // Alt+C: Toggle High Contrast Mode
+  // Alt+H: Toggle Tactile Haptic Vibrations
+  // Alt+I: Install / Download PWA with Voice Guidance
+  // Alt+S: Toggle Sound Cues
+  // Alt+L: Toggle Privacy Shield Lock
+  // Alt+E: Open End Chat Dialog (if in room)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.altKey) {
+        if (e.key === 'a' || e.key === 'A') {
+          e.preventDefault();
+          setIsA11yModalOpen((prev) => !prev);
+          return;
+        }
+        if (e.key === 'c' || e.key === 'C') {
+          e.preventDefault();
+          handleToggleHighContrast();
+          return;
+        }
+        if (e.key === 'h' || e.key === 'H') {
+          e.preventDefault();
+          handleToggleHaptic();
+          return;
+        }
+        if (e.key === 'i' || e.key === 'I') {
+          e.preventDefault();
+          installPWA();
+          return;
+        }
+        if (e.key === 's' || e.key === 'S') {
+          e.preventDefault();
+          handleToggleSound();
+          return;
+        }
+        if (e.key === 'l' || e.key === 'L') {
+          e.preventDefault();
+          setIsShieldLocked((prev) => !prev);
+          return;
+        }
+        if (e.key === 'e' || e.key === 'E') {
+          if (status === 'ACTIVE' || status === 'ENDED' || roomData) {
+            e.preventDefault();
+            setIsEndModalOpen(true);
+            return;
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleToggleHaptic, handleToggleHighContrast, handleToggleSound, installPWA, status, roomData]);
 
   const isHost = role === 'host';
   const otherName = isHost ? roomData?.guestName || 'Guest' : roomData?.hostName || 'Host';
@@ -51,20 +174,49 @@ export default function App() {
   if (bothEndedNotice || (status === 'DESTROYED' && !roomData)) {
     return (
       <main className="min-h-[100dvh] w-full bg-zinc-950 text-zinc-100 flex flex-col items-center justify-center">
-        <DestroyedNotice
-          onStartNew={resetToLanding}
-          message={error || 'The private room has been permanently destroyed.'}
-          isExpiredOrNonExistent={!!error}
-        />
+        {/* Skip to Content */}
+        <a
+          href="#destroyed-content"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:px-4 focus:py-2 focus:bg-emerald-500 focus:text-zinc-950 focus:font-bold focus:rounded-xl focus:shadow-xl focus:outline-none"
+        >
+          Skip to destroyed message
+        </a>
+        <div id="destroyed-content" className="w-full flex flex-col items-center justify-center">
+          <DestroyedNotice
+            onStartNew={resetToLanding}
+            message={error || 'The private room has been permanently destroyed.'}
+            isExpiredOrNonExistent={!!error}
+          />
+        </div>
         <OfflineIndicator />
+        <AccessibilityModal
+          isOpen={isA11yModalOpen}
+          onClose={() => setIsA11yModalOpen(false)}
+          soundEnabled={soundEnabled}
+          onToggleSound={handleToggleSound}
+          voiceEnabled={voiceEnabled}
+          onToggleVoice={handleToggleVoice}
+          highContrastEnabled={highContrastEnabled}
+          onToggleHighContrast={handleToggleHighContrast}
+          hapticEnabled={hapticEnabled}
+          onToggleHaptic={handleToggleHaptic}
+        />
       </main>
     );
   }
 
   return (
-    <main className="min-h-[100dvh] w-full bg-zinc-950 text-zinc-100 flex flex-col font-sans selection:bg-emerald-500 selection:text-white">
-      {/* Top Header */}
-      {status !== 'IDLE' && (
+    <div className="min-h-[100dvh] w-full bg-zinc-950 text-zinc-100 flex flex-col font-sans selection:bg-emerald-500 selection:text-white">
+      {/* Accessible Skip Link for Keyboard / Screen Reader users */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:px-4 focus:py-2 focus:bg-emerald-500 focus:text-zinc-950 focus:font-bold focus:rounded-xl focus:shadow-xl focus:outline-none"
+      >
+        Skip to main content
+      </a>
+
+      {/* Top Header when inside a room flow */}
+      {status !== 'IDLE' ? (
         <Header
           roomData={roomData}
           connectionState={connectionState}
@@ -72,13 +224,95 @@ export default function App() {
           onOpenEndModal={() => setIsEndModalOpen(true)}
           onToggleLock={() => setIsShieldLocked(true)}
           onUpdateTimer={(sec) => updateSettings(sec)}
+          soundEnabled={soundEnabled}
+          onToggleSound={handleToggleSound}
+          onOpenA11yModal={() => setIsA11yModalOpen(true)}
         />
+      ) : (
+        /* Top Navigation Header for Landing Screen */
+        <header role="banner" className="w-full border-b border-zinc-800/80 bg-zinc-950/90 safe-top px-3 py-2.5 sm:px-6">
+          <div className="max-w-3xl mx-auto flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <div
+                className="w-8 h-8 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-emerald-400"
+                aria-hidden="true"
+              >
+                <DoorClosed className="w-4 h-4" />
+              </div>
+              <span className="font-semibold text-xs sm:text-sm text-zinc-100">
+                PrivChat
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1.5 sm:gap-2" role="toolbar" aria-label="Accessibility & App Controls">
+              {/* Sound Cues Toggle */}
+              <button
+                onClick={handleToggleSound}
+                className={`p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg border text-xs flex items-center gap-1 transition cursor-pointer focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:outline-none ${
+                  soundEnabled
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20'
+                    : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
+                }`}
+                title={`Sound Cues: ${soundEnabled ? 'Enabled' : 'Muted'} (Alt+S)`}
+                aria-label={`Sound Cues: ${soundEnabled ? 'Enabled' : 'Muted'}. Press to toggle. Keyboard shortcut: Alt plus S.`}
+                aria-pressed={soundEnabled}
+              >
+                {soundEnabled ? (
+                  <Volume2 className="w-4 h-4 text-emerald-400" aria-hidden="true" />
+                ) : (
+                  <VolumeX className="w-4 h-4 text-zinc-500" aria-hidden="true" />
+                )}
+                <span className="hidden sm:inline">{soundEnabled ? 'Sound On' : 'Sound Off'}</span>
+              </button>
+
+              {/* Accessibility Modal Button */}
+              <button
+                onClick={() => setIsA11yModalOpen(true)}
+                className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-white text-xs flex items-center gap-1 transition cursor-pointer focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:outline-none"
+                title="Blind & Screen Reader Accessibility Guide (Alt+A)"
+                aria-label="Open Accessibility & Keyboard Shortcuts Guide. Keyboard shortcut: Alt plus A."
+              >
+                <Eye className="w-4 h-4 text-emerald-400" aria-hidden="true" />
+                <span className="hidden sm:inline">Accessibility</span>
+              </button>
+
+              <PWAInstallButton />
+            </div>
+          </div>
+        </header>
       )}
 
       {/* Main Flow Views based on Room State Machine */}
-      <div className="flex-1 flex flex-col w-full">
+      <main id="main-content" className="flex-1 flex flex-col w-full">
         {status === 'IDLE' && !roomId && (
           <LandingView onCreateRoom={createRoom} error={error} />
+        )}
+
+        {status === 'IDLE' && roomId && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="flex-1 flex flex-col items-center justify-center p-6 text-center space-y-4 animate-fade-in my-auto"
+          >
+            <div className="w-14 h-14 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-emerald-400 shadow-xl">
+              <span className="w-6 h-6 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+            </div>
+            <div className="space-y-1">
+              <h1 className="text-base font-medium text-zinc-200">Connecting to private room...</h1>
+              <p className="text-xs text-zinc-500">Establishing end-to-end encrypted channel</p>
+            </div>
+            {error && (
+              <div role="alert" className="max-w-sm p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs space-y-2 text-center">
+                <p>{error}</p>
+                <button
+                  onClick={resetToLanding}
+                  className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium cursor-pointer transition focus-visible:ring-2 focus-visible:ring-emerald-400"
+                >
+                  Return to Home
+                </button>
+              </div>
+            )}
+          </div>
         )}
 
         {/* Host Lobby View (Waiting for guest or answering a knock) */}
@@ -117,7 +351,7 @@ export default function App() {
             onUpdateTimer={updateSettings}
           />
         )}
-      </div>
+      </main>
 
       {/* End Chat Confirmation Modal */}
       <EndChatModal
@@ -134,8 +368,22 @@ export default function App() {
         onUnlock={() => setIsShieldLocked(false)}
       />
 
+      {/* Accessibility & Keyboard Guide Modal */}
+      <AccessibilityModal
+        isOpen={isA11yModalOpen}
+        onClose={() => setIsA11yModalOpen(false)}
+        soundEnabled={soundEnabled}
+        onToggleSound={handleToggleSound}
+        voiceEnabled={voiceEnabled}
+        onToggleVoice={handleToggleVoice}
+        highContrastEnabled={highContrastEnabled}
+        onToggleHighContrast={handleToggleHighContrast}
+        hapticEnabled={hapticEnabled}
+        onToggleHaptic={handleToggleHaptic}
+      />
+
       {/* Network Offline Toast */}
       <OfflineIndicator />
-    </main>
+    </div>
   );
 }

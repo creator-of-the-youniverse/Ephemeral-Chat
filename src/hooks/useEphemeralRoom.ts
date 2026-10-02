@@ -1,6 +1,22 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Message, RoomData, RoomStatus, ConnectionState, StoredSession } from '../types';
 import { getDerivedRoomKey, encryptText, decryptText } from '../lib/crypto';
+import { announce } from '../lib/announcer';
+import {
+  playDoorKnock,
+  playDoorOpen,
+  playMessageReceived,
+  playMessageSent,
+  playDestruct,
+  playAlert,
+} from '../lib/sound';
+import {
+  hapticKnock,
+  hapticDoorOpen,
+  hapticMessageReceived,
+  hapticMessageSent,
+  hapticDestruct,
+} from '../lib/haptic';
 
 async function decryptSingleMessage(msg: Message, key: CryptoKey | null): Promise<Message> {
   if (!key) return msg;
@@ -191,6 +207,9 @@ export function useEphemeralRoom() {
 
           case 'GUEST_KNOCKED':
             if (targetRole === 'host') {
+              playDoorKnock();
+              hapticKnock();
+              announce(`Knock on the door! ${data.guestName} wants to enter your private chat.`, 'assertive');
               setGuestKnocked({ guestName: data.guestName });
               setStatus('GUEST_KNOCKED');
               setRoomData((prev) => (prev ? { ...prev, guestName: data.guestName, status: 'GUEST_KNOCKED' } : null));
@@ -198,6 +217,9 @@ export function useEphemeralRoom() {
             break;
 
           case 'DOOR_OPENED':
+            playDoorOpen();
+            hapticDoorOpen();
+            announce('The door was opened! You are now in the private chat.', 'assertive');
             setStatus('ACTIVE');
             setGuestKnocked(null);
             setKnockDeclined(false);
@@ -210,6 +232,8 @@ export function useEphemeralRoom() {
 
           case 'KNOCK_DECLINED':
             if (targetRole === 'guest') {
+              playAlert();
+              announce('The door was not opened. The host chose to keep the door closed.', 'assertive');
               setKnockDeclined(true);
               setStatus('WAITING_FOR_GUEST');
             }
@@ -220,6 +244,18 @@ export function useEphemeralRoom() {
               const activeKey = roomKeyRef.current || (await getDerivedRoomKey(targetRoomId));
               roomKeyRef.current = activeKey;
               const decrypted = await decryptSingleMessage(data.message, activeKey);
+
+              if (decrypted.sender !== targetRole) {
+                playMessageReceived();
+                hapticMessageReceived();
+                const contentText =
+                  decrypted.messageType === 'image'
+                    ? decrypted.text
+                      ? `Photo with description: ${decrypted.text}`
+                      : 'An encrypted temporary photo'
+                    : decrypted.text;
+                announce(`New message from ${decrypted.senderName}: ${contentText}`, 'polite');
+              }
 
               setRoomData((prev) => {
                 if (!prev) return null;
@@ -241,6 +277,9 @@ export function useEphemeralRoom() {
             break;
 
           case 'MESSAGE_DESTRUCTED':
+            playDestruct();
+            hapticDestruct();
+            announce('An ephemeral message has dissolved and vanished permanently.', 'polite');
             setRoomData((prev) => {
               if (!prev) return null;
               return {
@@ -253,6 +292,17 @@ export function useEphemeralRoom() {
           case 'PRESENCE_CHANGE':
             setRoomData((prev) => {
               if (!prev) return null;
+              const isOtherNowConnected = targetRole === 'host' ? data.guestConnected : data.hostConnected;
+              const wasOtherConnected = targetRole === 'host' ? prev.guestConnected : prev.hostConnected;
+              if (isOtherNowConnected !== wasOtherConnected) {
+                const partnerName = targetRole === 'host' ? (prev.guestName || 'Guest') : prev.hostName;
+                announce(
+                  isOtherNowConnected
+                    ? `${partnerName} is now in the room.`
+                    : `${partnerName} has disconnected from the room.`,
+                  'polite'
+                );
+              }
               return {
                 ...prev,
                 hostConnected: data.hostConnected,
@@ -262,6 +312,11 @@ export function useEphemeralRoom() {
             break;
 
           case 'PARTICIPANT_ENDED':
+            playAlert();
+            announce(
+              `${data.endedByName || 'The other participant'} has ended their side of the conversation.`,
+              'assertive'
+            );
             if (data.room) {
               setRoomData(data.room);
               setStatus(data.room.status);
@@ -284,6 +339,12 @@ export function useEphemeralRoom() {
             break;
 
           case 'ROOM_DESTROYED':
+            playDestruct();
+            hapticDestruct();
+            announce(
+              'Both sides have ended. All messages and room records have been permanently destroyed.',
+              'assertive'
+            );
             isExplicitlyLeavingRef.current = true;
             clearSession(targetRoomId);
             setBothEndedNotice(true);
@@ -295,6 +356,11 @@ export function useEphemeralRoom() {
             break;
 
           case 'SETTINGS_CHANGED':
+            if (data.autoDestructSeconds > 0) {
+              announce(`Auto-destruct timer set to ${data.autoDestructSeconds} seconds.`, 'polite');
+            } else {
+              announce('Auto-destruct timer turned off.', 'polite');
+            }
             setRoomData((prev) => (prev ? { ...prev, autoDestructSeconds: data.autoDestructSeconds } : null));
             break;
 
@@ -303,6 +369,7 @@ export function useEphemeralRoom() {
               setPeerTyping(data.isTyping);
               if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
               if (data.isTyping) {
+                announce('The other person is typing...', 'polite');
                 typingTimerRef.current = setTimeout(() => {
                   setPeerTyping(false);
                 }, 3000);
@@ -378,8 +445,14 @@ export function useEphemeralRoom() {
             setStatus('DESTROYED');
           }
         })
-        .catch(() => {
-          connectWebSocket(urlRoomId, existingSession.token, existingSession.role);
+        .catch((err) => {
+          if (err.message && (err.message.includes('no longer exists') || err.message.includes('closed'))) {
+            clearSession(urlRoomId);
+            setError(err.message);
+            setStatus('DESTROYED');
+          } else {
+            connectWebSocket(urlRoomId, existingSession.token, existingSession.role);
+          }
         });
     } else {
       // Arrived via invitation link as guest
@@ -387,7 +460,7 @@ export function useEphemeralRoom() {
         .then((res) => parseJsonResponse(res, 'Room query failed'))
         .then((data) => {
           if (!data.exists) {
-            setError('This private room no longer exists.');
+            setError(data.error || 'This private room no longer exists.');
             setStatus('DESTROYED');
           } else if (data.status === 'ENDED' || (data.hostEnded && data.guestEnded)) {
             setError('This private room has been closed.');
@@ -424,6 +497,78 @@ export function useEphemeralRoom() {
     };
   }, [extractRoomIdFromUrl, loadSession, clearSession, connectWebSocket]);
 
+  // Periodic HTTP polling sync as fallback when WebSocket is disconnected or in background
+  useEffect(() => {
+    if (!roomId || !token || !role || status === 'DESTROYED' || status === 'IDLE') {
+      return;
+    }
+
+    let isPolling = false;
+    const syncRoom = async () => {
+      if (isPolling) return;
+      // If WebSocket is open and active, skip polling
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        return;
+      }
+
+      isPolling = true;
+      try {
+        const res = await fetch(`/api/rooms/${roomId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await parseJsonResponse(res, 'Sync failed');
+        if (!data.exists || !data.room) {
+          isExplicitlyLeavingRef.current = true;
+          clearSession(roomId);
+          setBothEndedNotice(true);
+          setStatus('DESTROYED');
+          setRoomData(null);
+          return;
+        }
+
+        const activeKey = roomKeyRef.current || (await getDerivedRoomKey(roomId));
+        roomKeyRef.current = activeKey;
+        const decryptedMessages = await Promise.all(
+          data.room.messages.map((m: Message) => decryptSingleMessage(m, activeKey))
+        );
+
+        setRoomData({ ...data.room, messages: decryptedMessages });
+        setStatus(data.room.status);
+
+        if (data.room.status === 'GUEST_KNOCKED' && role === 'host' && data.room.guestName) {
+          if (status !== 'GUEST_KNOCKED') {
+            playDoorKnock();
+            announce(`Knock on the door! ${data.room.guestName} wants to enter your private chat.`, 'assertive');
+          }
+          setGuestKnocked({ guestName: data.room.guestName });
+        } else if (data.room.status === 'ACTIVE') {
+          if (status === 'GUEST_KNOCKED') {
+            playDoorOpen();
+            announce('The door was opened! You are now in the private chat.', 'assertive');
+          }
+          setGuestKnocked(null);
+        }
+
+        if (data.room.hostEnded && data.room.guestEnded) {
+          playDestruct();
+          announce('Both participants have left. Room destroyed.', 'assertive');
+          isExplicitlyLeavingRef.current = true;
+          clearSession(roomId);
+          setBothEndedNotice(true);
+          setStatus('DESTROYED');
+          setRoomData(null);
+        }
+      } catch {
+        // network hiccup, retry next tick
+      } finally {
+        isPolling = false;
+      }
+    };
+
+    const interval = setInterval(syncRoom, 2500);
+    return () => clearInterval(interval);
+  }, [roomId, token, role, status, clearSession]);
+
   // Action: Create Room (Host)
   const createRoom = async (hostName: string) => {
     setError(null);
@@ -443,6 +588,8 @@ export function useEphemeralRoom() {
       setRole('host');
       setRoomData(data.room);
       setStatus('WAITING_FOR_GUEST');
+
+      announce('Private room created. Share your private link to invite someone.', 'polite');
 
       // Update URL silently
       window.history.pushState({}, '', `/chat/${newRoomId}`);
@@ -484,6 +631,9 @@ export function useEphemeralRoom() {
 
       setRoomData((prev) => (prev ? { ...prev, guestName, status: 'GUEST_KNOCKED' } : null));
 
+      playDoorKnock();
+      announce('Knock sent. Waiting for the host to open the door.', 'polite');
+
       saveSession({
         roomId,
         token: newGuestToken,
@@ -509,6 +659,9 @@ export function useEphemeralRoom() {
 
       await parseJsonResponse(res, 'Failed to open door');
 
+      playDoorOpen();
+      announce('You opened the door. The private chat is now active.', 'assertive');
+
       setStatus('ACTIVE');
       setGuestKnocked(null);
       setRoomData((prev) => (prev ? { ...prev, status: 'ACTIVE' } : null));
@@ -525,6 +678,8 @@ export function useEphemeralRoom() {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       });
+
+      announce('You kept the door closed.', 'polite');
 
       setGuestKnocked(null);
       setStatus('WAITING_FOR_GUEST');
@@ -557,6 +712,10 @@ export function useEphemeralRoom() {
       isEncrypted,
       autoDestructSeconds: autoDestructSeconds || roomData?.autoDestructSeconds || 0,
     };
+
+    playMessageSent();
+    hapticMessageSent();
+    announce('Message sent.', 'polite');
 
     // Send through WebSocket if open, fallback to HTTP POST
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
@@ -612,6 +771,10 @@ export function useEphemeralRoom() {
       autoDestructSeconds: options.autoDestructSeconds || roomData?.autoDestructSeconds || 0,
     };
 
+    playMessageSent();
+    hapticMessageSent();
+    announce('Encrypted temporary photo sent.', 'polite');
+
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify(payload));
     } else {
@@ -633,6 +796,9 @@ export function useEphemeralRoom() {
 
   // Action: Destroy / Delete message immediately (e.g. view-once dissolution)
   const destroyMessage = (messageId: string) => {
+    playDestruct();
+    announce('Message permanently dissolved.', 'polite');
+
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: 'DESTROY_MESSAGE', messageId }));
     } else if (roomId && token) {
@@ -665,6 +831,8 @@ export function useEphemeralRoom() {
 
       if (data.destroyed) {
         // Both participants have ended -> Permanent destruction
+        playDestruct();
+        announce('Both participants have ended the chat. Room and messages have been permanently destroyed.', 'assertive');
         isExplicitlyLeavingRef.current = true;
         clearSession(roomId);
         setBothEndedNotice(true);
@@ -673,7 +841,8 @@ export function useEphemeralRoom() {
         if (wsRef.current) wsRef.current.close();
       } else {
         // One side ended:
-        // Hide other person's messages from local view immediately!
+        playAlert();
+        announce('You have closed your side of the conversation.', 'polite');
         setRoomData((prev) => {
           if (!prev) return null;
           const isHost = role === 'host';
@@ -737,6 +906,7 @@ export function useEphemeralRoom() {
     setKnockDeclined(false);
     setBothEndedNotice(false);
     setOtherParticipantEndedNotice(null);
+    announce('Returned to home screen.', 'polite');
     window.history.pushState({}, '', '/');
   };
 

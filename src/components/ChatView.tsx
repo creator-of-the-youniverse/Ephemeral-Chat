@@ -99,8 +99,8 @@ export const ChatView: React.FC<ChatViewProps> = ({
     <div className="flex-1 flex flex-col w-full max-w-3xl mx-auto h-[calc(100dvh-60px)] min-h-0 bg-zinc-950">
       {/* Informational Sub-Header Bar */}
       <div className="px-3 sm:px-4 py-2 bg-zinc-900/60 border-b border-zinc-800/80 flex items-center justify-between text-xs text-zinc-400 gap-2">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <Shield className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+        <div className="flex items-center gap-1.5 min-w-0" aria-label="Privacy guarantee: Zero logs, direct ephemeral room">
+          <Shield className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" aria-hidden="true" />
           <span className="truncate">
             Zero logs • Direct ephemeral room
           </span>
@@ -110,36 +110,44 @@ export const ChatView: React.FC<ChatViewProps> = ({
         <div className="relative flex-shrink-0">
           <button
             onClick={() => setShowTimerMenu(!showTimerMenu)}
-            className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition cursor-pointer border ${
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium transition cursor-pointer border focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:outline-none ${
               selectedTimer > 0
                 ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
                 : 'bg-zinc-800/80 text-zinc-400 border-zinc-700/60 hover:text-zinc-200'
             }`}
-            title="Auto-Destruct Timer"
+            aria-haspopup="menu"
+            aria-expanded={showTimerMenu}
+            aria-label={`Auto-destruct timer: ${selectedTimer > 0 ? `${selectedTimer} seconds` : 'Off'}. Press to change.`}
           >
-            <Timer className="w-3 h-3" />
+            <Timer className="w-3 h-3" aria-hidden="true" />
             <span>Destruct: {selectedTimer > 0 ? `${selectedTimer}s` : 'Off'}</span>
           </button>
 
           {showTimerMenu && (
-            <div className="absolute right-0 top-full mt-1 w-36 rounded-xl bg-zinc-900 border border-zinc-800 shadow-xl z-20 py-1 text-xs">
-              <span className="px-3 py-1 text-[10px] text-zinc-500 uppercase font-bold tracking-wider block">
+            <div
+              role="menu"
+              aria-label="Select message auto-destruct time"
+              className="absolute right-0 top-full mt-1 w-40 rounded-xl bg-zinc-900 border border-zinc-800 shadow-xl z-20 py-1 text-xs"
+            >
+              <span className="px-3 py-1 text-[10px] text-zinc-500 uppercase font-bold tracking-wider block" aria-hidden="true">
                 Message Expiry
               </span>
               {timerOptions.map((opt) => (
                 <button
                   key={opt.value}
+                  role="menuitemradio"
+                  aria-checked={selectedTimer === opt.value}
                   onClick={() => {
                     setSelectedTimer(opt.value);
                     onUpdateTimer(opt.value);
                     setShowTimerMenu(false);
                   }}
-                  className={`w-full text-left px-3 py-1.5 hover:bg-zinc-800 text-xs transition flex items-center justify-between ${
+                  className={`w-full text-left px-3 py-1.5 hover:bg-zinc-800 text-xs transition flex items-center justify-between cursor-pointer focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:outline-none ${
                     selectedTimer === opt.value ? 'text-emerald-400 font-semibold' : 'text-zinc-300'
                   }`}
                 >
-                  <span>{opt.label}</span>
-                  {selectedTimer === opt.value && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
+                  <span>{opt.label === 'Off' ? 'Off (keep in session)' : opt.label}</span>
+                  {selectedTimer === opt.value && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" aria-hidden="true" />}
                 </button>
               ))}
             </div>
@@ -149,8 +157,12 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
       {/* Notices regarding ended sides */}
       {otherEnded && (
-        <div className="mx-3 sm:mx-4 mt-2 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-300 text-xs flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 flex-shrink-0 text-amber-400" />
+        <div
+          role="status"
+          aria-live="polite"
+          className="mx-3 sm:mx-4 mt-2 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-300 text-xs flex items-center gap-2"
+        >
+          <AlertTriangle className="w-4 h-4 flex-shrink-0 text-amber-400" aria-hidden="true" />
           <span>
             {otherName} has ended their side of the conversation. You can still see your side until you also end.
           </span>
@@ -158,8 +170,12 @@ export const ChatView: React.FC<ChatViewProps> = ({
       )}
 
       {myEnded && (
-        <div className="mx-3 sm:mx-4 mt-2 p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 text-xs flex items-center gap-2">
-          <Info className="w-4 h-4 flex-shrink-0 text-zinc-400" />
+        <div
+          role="status"
+          aria-live="polite"
+          className="mx-3 sm:mx-4 mt-2 p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 text-xs flex items-center gap-2"
+        >
+          <Info className="w-4 h-4 flex-shrink-0 text-zinc-400" aria-hidden="true" />
           <span>
             You've closed your side of this conversation. When {otherName} ends their side, all messages will be permanently destroyed.
           </span>
@@ -167,10 +183,17 @@ export const ChatView: React.FC<ChatViewProps> = ({
       )}
 
       {/* Messages Scroll Area */}
-      <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3">
+      <div
+        role="log"
+        aria-label={`Conversation with ${otherName || 'participant'}`}
+        aria-live="polite"
+        aria-relevant="additions"
+        tabIndex={0}
+        className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:outline-none rounded-xl"
+      >
         {roomData.messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center p-6 text-zinc-500 space-y-2 select-none">
-            <div className="w-10 h-10 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-600">
+            <div className="w-10 h-10 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-600" aria-hidden="true">
               <Shield className="w-5 h-5" />
             </div>
             <p className="text-sm text-zinc-400 font-medium">Room open</p>
@@ -184,24 +207,30 @@ export const ChatView: React.FC<ChatViewProps> = ({
             const remainingSeconds = msg.expiresAt
               ? Math.max(0, Math.ceil((msg.expiresAt - now) / 1000))
               : null;
+            const timeStr = new Date(msg.createdAt).toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit',
+            });
+            const accessibleLabel = `${isMe ? 'You' : msg.senderName} at ${timeStr}: ${
+              msg.messageType === 'image'
+                ? `Photo${msg.text ? `, description: ${msg.text}` : ''}${msg.viewOnce ? ', view once' : ''}`
+                : msg.text
+            }${remainingSeconds !== null ? `. Dissolves in ${remainingSeconds} seconds.` : ''}`;
 
             return (
-              <div
+              <article
                 key={msg.id}
-                className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} space-y-1 animate-fade-in`}
+                tabIndex={0}
+                aria-label={accessibleLabel}
+                className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} space-y-1 animate-fade-in focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:outline-none rounded-2xl p-1`}
               >
                 {/* Sender Name & Timestamp */}
-                <div className="flex items-center gap-1.5 px-1 text-[11px] text-zinc-500">
+                <div className="flex items-center gap-1.5 px-1 text-[11px] text-zinc-500" aria-hidden="true">
                   <span className={`font-medium ${isMe ? 'text-emerald-400/90' : 'text-zinc-400'}`}>
                     {isMe ? 'You' : msg.senderName}
                   </span>
                   <span>•</span>
-                  <span>
-                    {new Date(msg.createdAt).toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </span>
+                  <span>{timeStr}</span>
 
                   {remainingSeconds !== null && (
                     <span className="flex items-center gap-0.5 text-amber-400 font-mono text-[10px] ml-1 bg-amber-500/10 px-1.5 py-0.5 rounded">
@@ -216,17 +245,19 @@ export const ChatView: React.FC<ChatViewProps> = ({
                   <div
                     className={`max-w-[85%] sm:max-w-[75%] p-2 rounded-2xl shadow-md space-y-1.5 ${
                       isMe
-                        ? 'bg-emerald-950/80 border border-emerald-500/40 rounded-tr-xs'
-                        : 'bg-zinc-900 border border-zinc-700/70 rounded-tl-xs'
+                        ? 'chat-bubble-me bg-emerald-950/80 border border-emerald-500/40 rounded-tr-xs'
+                        : 'chat-bubble-peer bg-zinc-900 border border-zinc-700/70 rounded-tl-xs'
                     }`}
                   >
-                    <div
+                    <button
+                      type="button"
                       onClick={() => setActiveImageModal(msg)}
-                      className="relative rounded-xl overflow-hidden cursor-pointer group bg-black/60 max-w-sm"
+                      className="relative block rounded-xl overflow-hidden cursor-pointer group bg-black/60 max-w-sm text-left focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:outline-none"
+                      aria-label={`Open photo view: ${msg.text || 'Encrypted ephemeral photo'}. ${msg.viewOnce ? 'Warning: View once photo.' : ''}`}
                     >
                       <img
                         src={msg.imageData}
-                        alt="Encrypted temporary capture"
+                        alt={msg.text ? `Ephemeral photo: ${msg.text}` : 'Ephemeral photo sent in private room'}
                         className={`w-full max-h-64 sm:max-h-80 object-cover rounded-xl transition duration-200 group-hover:scale-[1.01] ${
                           msg.viewOnce && !isMe ? 'filter blur-sm hover:blur-none transition' : ''
                         }`}
@@ -234,7 +265,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
                       />
 
                       {/* Header overlay badge */}
-                      <div className="absolute top-2 left-2 flex items-center gap-1.5">
+                      <div className="absolute top-2 left-2 flex items-center gap-1.5" aria-hidden="true">
                         <span className="bg-black/75 backdrop-blur-md text-[10px] text-emerald-400 font-mono px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-500/30">
                           <Lock className="w-2.5 h-2.5" />
                           <span>AES-256</span>
@@ -248,15 +279,16 @@ export const ChatView: React.FC<ChatViewProps> = ({
                       </div>
 
                       {/* Hover action hint */}
-                      <div className="absolute inset-0 bg-black/20 group-hover:bg-black/0 transition flex items-center justify-center pointer-events-none">
+                      <div className="absolute inset-0 bg-black/20 group-hover:bg-black/0 transition flex items-center justify-center pointer-events-none" aria-hidden="true">
                         <span className="bg-zinc-900/80 backdrop-blur-md border border-zinc-700 text-zinc-200 text-[11px] px-3 py-1 rounded-full opacity-0 group-hover:opacity-100 transition shadow">
                           Tap to view full photo
                         </span>
                       </div>
-                    </div>
+                    </button>
 
                     {msg.text && (
                       <p className="text-xs px-1 text-zinc-200 break-words leading-relaxed">
+                        <span className="sr-only">Photo description: </span>
                         {msg.text}
                       </p>
                     )}
@@ -265,22 +297,26 @@ export const ChatView: React.FC<ChatViewProps> = ({
                   <div
                     className={`max-w-[85%] sm:max-w-[75%] px-4 py-2.5 rounded-2xl text-sm break-words whitespace-pre-wrap leading-relaxed shadow-sm ${
                       isMe
-                        ? 'bg-emerald-600 text-white rounded-tr-xs'
-                        : 'bg-zinc-800 text-zinc-100 rounded-tl-xs border border-zinc-700/60'
+                        ? 'chat-bubble-me bg-emerald-600 text-white rounded-tr-xs'
+                        : 'chat-bubble-peer bg-zinc-800 text-zinc-100 rounded-tl-xs border border-zinc-700/60'
                     }`}
                   >
                     {msg.text}
                   </div>
                 )}
-              </div>
+              </article>
             );
           })
         )}
 
         {/* Peer Typing Indicator */}
         {peerTyping && (
-          <div className="flex items-center gap-2 text-xs text-zinc-400 pl-2 animate-pulse">
-            <span className="flex gap-1">
+          <div
+            role="status"
+            aria-live="polite"
+            className="flex items-center gap-2 text-xs text-zinc-400 pl-2 animate-pulse"
+          >
+            <span className="flex gap-1" aria-hidden="true">
               <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-bounce" />
               <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-bounce [animation-delay:0.2s]" />
               <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-bounce [animation-delay:0.4s]" />
@@ -295,35 +331,47 @@ export const ChatView: React.FC<ChatViewProps> = ({
       {/* Keyboard-Aware Chat Composer */}
       <div className="p-2 sm:p-3 border-t border-zinc-800/80 bg-zinc-950 safe-bottom">
         {myEnded ? (
-          <div className="text-center py-2 text-xs text-zinc-500">
+          <div className="text-center py-2 text-xs text-zinc-500" role="status">
             You ended your side. You cannot send new messages.
           </div>
         ) : (
-          <form onSubmit={handleSend} className="flex items-end gap-2">
+          <form onSubmit={handleSend} className="flex items-end gap-2" role="search" aria-label="Message composer">
             {/* Camera Trigger Button */}
             <button
               type="button"
               onClick={() => setIsCameraOpen(true)}
               disabled={myEnded}
-              className="h-10 w-10 flex items-center justify-center rounded-2xl bg-zinc-900 hover:bg-zinc-800 text-emerald-400 border border-zinc-800 hover:border-emerald-500/50 transition flex-shrink-0 active:scale-95 cursor-pointer disabled:opacity-40"
+              className="h-10 w-10 flex items-center justify-center rounded-2xl bg-zinc-900 hover:bg-zinc-800 text-emerald-400 border border-zinc-800 hover:border-emerald-500/50 transition flex-shrink-0 active:scale-95 cursor-pointer disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:outline-none"
               title="Capture & send private ephemeral photo"
+              aria-label="Capture and send private ephemeral photo with optional audio description"
             >
-              <Camera className="w-4 h-4" />
+              <Camera className="w-4 h-4" aria-hidden="true" />
             </button>
 
             <div className="flex-1 relative rounded-2xl bg-zinc-900 border border-zinc-800 focus-within:border-emerald-500/80 transition shadow-inner">
+              <label htmlFor="chat-message-input" className="sr-only">
+                Type your private message
+              </label>
               <textarea
+                id="chat-message-input"
                 ref={inputRef}
                 rows={1}
                 value={inputText}
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
                 placeholder="Type a private message..."
+                aria-describedby="chat-input-keyboard-hint"
                 className="w-full pl-3.5 pr-10 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 bg-transparent resize-none focus:outline-none max-h-32"
               />
+              <span id="chat-input-keyboard-hint" className="sr-only">
+                Press Enter to send message. Press Shift plus Enter for a new line.
+              </span>
 
               {selectedTimer > 0 && (
-                <div className="absolute right-2.5 bottom-2.5 text-amber-400 text-[10px] font-mono flex items-center gap-0.5 bg-amber-500/10 px-1 rounded">
+                <div
+                  className="absolute right-2.5 bottom-2.5 text-amber-400 text-[10px] font-mono flex items-center gap-0.5 bg-amber-500/10 px-1 rounded pointer-events-none"
+                  aria-hidden="true"
+                >
                   <Timer className="w-2.5 h-2.5" />
                   {selectedTimer}s
                 </div>
@@ -333,10 +381,11 @@ export const ChatView: React.FC<ChatViewProps> = ({
             <button
               type="submit"
               disabled={!inputText.trim() || myEnded}
-              className="h-10 w-10 flex items-center justify-center rounded-2xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-zinc-950 font-bold transition flex-shrink-0 active:scale-95 cursor-pointer shadow-md shadow-emerald-500/20"
-              title="Send Message"
+              className="h-10 w-10 flex items-center justify-center rounded-2xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-zinc-950 font-bold transition flex-shrink-0 active:scale-95 cursor-pointer shadow-md shadow-emerald-500/20 focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:outline-none"
+              title="Send Message (Enter)"
+              aria-label="Send Message"
             >
-              <Send className="w-4 h-4" />
+              <Send className="w-4 h-4" aria-hidden="true" />
             </button>
           </form>
         )}

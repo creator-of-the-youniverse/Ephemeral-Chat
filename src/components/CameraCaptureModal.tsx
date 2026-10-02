@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Camera, X, RefreshCw, Check, Shield, EyeOff, Timer, AlertCircle, Upload } from 'lucide-react';
+import { playCameraShutter } from '../lib/sound';
+import { hapticShutter } from '../lib/haptic';
+import { announce } from '../lib/announcer';
 
 interface CameraCaptureModalProps {
   isOpen: boolean;
@@ -29,8 +32,35 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
   const [autoDestructSeconds, setAutoDestructSeconds] = useState(defaultDestructSeconds || 30);
   const [caption, setCaption] = useState('');
 
+  const modalRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const shutterRef = useRef<HTMLButtonElement | null>(null);
+  const captionInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Trap focus and handle Escape
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        stopCameraStream();
+        onClose();
+        return;
+      }
+
+      // Spacebar on viewfinder triggers shutter if camera ready
+      if (e.key === ' ' && !capturedImage && !cameraError && document.activeElement?.tagName !== 'INPUT') {
+        e.preventDefault();
+        handleSnap();
+        return;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, capturedImage, cameraError]);
 
   // Stop camera tracks cleanly
   const stopCameraStream = (activeStream?: MediaStream | null) => {
@@ -72,12 +102,17 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
         videoRef.current.srcObject = newStream;
         await videoRef.current.play();
       }
+      announce(
+        `Camera active, facing ${mode === 'environment' ? 'rear' : 'front'} camera. Press the shutter button or spacebar to take photo.`,
+        'polite'
+      );
     } catch (err: any) {
       const msg =
         err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError'
           ? 'Camera permission was denied. You can allow camera access in browser settings or use the file picker.'
           : err.message || 'Unable to access device camera.';
       setCameraError(msg);
+      announce(`Camera notice: ${msg}`, 'assertive');
     } finally {
       setIsInitializing(false);
     }
@@ -102,6 +137,7 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
   const handleToggleFacingMode = () => {
     const nextMode = facingMode === 'environment' ? 'user' : 'environment';
     setFacingMode(nextMode);
+    announce(`Switched to ${nextMode === 'environment' ? 'rear' : 'front'} camera.`, 'polite');
   };
 
   // Capture current frame from <video> into canvas
@@ -110,8 +146,10 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
     const video = videoRef.current;
     if (video.videoWidth === 0 || video.videoHeight === 0) return;
 
+    playCameraShutter();
+    hapticShutter();
+
     const canvas = document.createElement('canvas');
-    // Max dimension 1024 for fast encryption and crisp ephemeral viewing
     const maxDim = 1024;
     let width = video.videoWidth;
     let height = video.videoHeight;
@@ -141,6 +179,11 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
 
     stopCameraStream();
     setCapturedImage(dataUrl);
+    announce('Photo captured. Please add an optional description for screen readers, or press Send.', 'polite');
+
+    setTimeout(() => {
+      captionInputRef.current?.focus();
+    }, 150);
   };
 
   // Fallback for native camera file picker
@@ -173,6 +216,8 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
           const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
           stopCameraStream();
           setCapturedImage(dataUrl);
+          playCameraShutter();
+          announce('Image selected. You can add an optional description before sending.', 'polite');
         }
       };
       img.src = event.target?.result as string;
@@ -183,6 +228,7 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
   const handleRetake = () => {
     setCapturedImage(null);
     startCamera(facingMode);
+    announce('Retaking photo. Camera reopened.', 'polite');
   };
 
   const handleSend = async () => {
@@ -203,20 +249,29 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-3 sm:p-4 animate-fade-in">
-      <div className="relative w-full max-w-lg bg-zinc-950 border border-zinc-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[92dvh]">
+    <div
+      role="presentation"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-3 sm:p-4 animate-fade-in"
+    >
+      <div
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="camera-modal-title"
+        className="relative w-full max-w-lg bg-zinc-950 border border-zinc-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[92dvh]"
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800/80 bg-zinc-900/70">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-emerald-400">
+            <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-emerald-400" aria-hidden="true">
               <Camera className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-zinc-100">
+              <h3 id="camera-modal-title" className="text-sm font-semibold text-zinc-100">
                 {capturedImage ? 'Review Temporary Photo' : 'Private Camera'}
               </h3>
               <p className="text-[11px] text-zinc-400 flex items-center gap-1">
-                <Shield className="w-3 h-3 text-emerald-400" />
+                <Shield className="w-3 h-3 text-emerald-400" aria-hidden="true" />
                 <span>AES-GCM End-to-End Encrypted</span>
               </p>
             </div>
@@ -227,10 +282,10 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
               stopCameraStream();
               onClose();
             }}
-            className="w-8 h-8 rounded-full bg-zinc-800/80 text-zinc-400 hover:text-white flex items-center justify-center transition cursor-pointer"
-            title="Close camera"
+            className="w-8 h-8 rounded-full bg-zinc-800/80 text-zinc-400 hover:text-white flex items-center justify-center transition cursor-pointer focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:outline-none"
+            aria-label="Close camera (Escape)"
           >
-            <X className="w-4 h-4" />
+            <X className="w-4 h-4" aria-hidden="true" />
           </button>
         </div>
 
@@ -240,18 +295,18 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
             <div className="relative w-full h-full flex items-center justify-center p-2">
               <img
                 src={capturedImage}
-                alt="Captured temporary"
+                alt={caption ? `Captured photo: ${caption}` : 'Captured temporary photo ready to send'}
                 className="max-h-[60dvh] w-auto max-w-full object-contain rounded-2xl select-none pointer-events-none"
                 onContextMenu={(e) => e.preventDefault()}
               />
-              <div className="absolute top-4 left-4 bg-zinc-900/80 backdrop-blur-md border border-zinc-700/60 px-2.5 py-1 rounded-full text-[11px] font-mono text-emerald-400 flex items-center gap-1.5 shadow">
+              <div className="absolute top-4 left-4 bg-zinc-900/80 backdrop-blur-md border border-zinc-700/60 px-2.5 py-1 rounded-full text-[11px] font-mono text-emerald-400 flex items-center gap-1.5 shadow" aria-hidden="true">
                 <Shield className="w-3 h-3" />
                 <span>Encrypted In-Memory</span>
               </div>
             </div>
           ) : cameraError ? (
-            <div className="p-6 text-center max-w-sm space-y-4">
-              <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 mx-auto">
+            <div className="p-6 text-center max-w-sm space-y-4" role="alert">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 mx-auto" aria-hidden="true">
                 <AlertCircle className="w-6 h-6" />
               </div>
               <div>
@@ -260,24 +315,25 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
               </div>
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="w-full py-2.5 px-4 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-100 text-xs font-semibold flex items-center justify-center gap-2 transition cursor-pointer border border-zinc-700"
+                className="w-full py-2.5 px-4 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-100 text-xs font-semibold flex items-center justify-center gap-2 transition cursor-pointer border border-zinc-700 focus-visible:ring-2 focus-visible:ring-emerald-400"
               >
-                <Upload className="w-4 h-4 text-emerald-400" />
+                <Upload className="w-4 h-4 text-emerald-400" aria-hidden="true" />
                 <span>Take Photo / Upload with Device</span>
               </button>
             </div>
           ) : (
-            <div className="relative w-full h-full flex items-center justify-center">
+            <div className="relative w-full h-full flex items-center justify-center" aria-label="Camera viewfinder">
               <video
                 ref={videoRef}
                 playsInline
                 muted
                 autoPlay
                 className="w-full h-full object-cover max-h-[60dvh]"
+                aria-label="Live camera feed"
               />
 
               {/* Viewfinder Target Framing */}
-              <div className="absolute inset-8 pointer-events-none border-2 border-white/20 rounded-3xl flex flex-col justify-between p-4">
+              <div className="absolute inset-8 pointer-events-none border-2 border-white/20 rounded-3xl flex flex-col justify-between p-4" aria-hidden="true">
                 <div className="flex justify-between">
                   <div className="w-5 h-5 border-t-2 border-l-2 border-emerald-400 rounded-tl-lg" />
                   <div className="w-5 h-5 border-t-2 border-r-2 border-emerald-400 rounded-tr-lg" />
@@ -289,7 +345,7 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
               </div>
 
               {isInitializing && (
-                <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-xs text-zinc-400">
+                <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-xs text-zinc-400" role="status">
                   Starting camera...
                 </div>
               )}
@@ -303,6 +359,7 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
             capture="environment"
             onChange={handleFileChange}
             className="hidden"
+            aria-label="Choose photo from device"
           />
         </div>
 
@@ -315,31 +372,47 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
                 {/* View-once switch */}
                 <button
                   type="button"
-                  onClick={() => setViewOnce(!viewOnce)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition cursor-pointer ${
+                  role="switch"
+                  aria-checked={viewOnce}
+                  onClick={() => {
+                    const next = !viewOnce;
+                    setViewOnce(next);
+                    announce(`View once mode is now ${next ? 'active' : 'turned off'}.`, 'polite');
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition cursor-pointer focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:outline-none ${
                     viewOnce
                       ? 'bg-amber-500/15 border-amber-500/40 text-amber-300'
                       : 'bg-zinc-800/60 border-zinc-700/50 text-zinc-400 hover:text-zinc-200'
                   }`}
+                  aria-label={`View once mode: ${viewOnce ? 'Active. Photo will delete after 10 seconds of opening' : 'Inactive'}`}
                 >
-                  <EyeOff className="w-3.5 h-3.5" />
+                  <EyeOff className="w-3.5 h-3.5" aria-hidden="true" />
                   <span>{viewOnce ? 'View Once: Active' : 'View Once'}</span>
                 </button>
 
                 {/* Auto-destruct timer selector */}
                 {!viewOnce && (
-                  <div className="flex items-center gap-1 bg-zinc-800/60 border border-zinc-700/50 rounded-xl p-1 text-xs text-zinc-400">
-                    <Timer className="w-3 h-3 ml-1.5 text-zinc-500" />
+                  <div
+                    className="flex items-center gap-1 bg-zinc-800/60 border border-zinc-700/50 rounded-xl p-1 text-xs text-zinc-400"
+                    role="group"
+                    aria-label="Photo auto-destruct timer"
+                  >
+                    <Timer className="w-3 h-3 ml-1.5 text-zinc-500" aria-hidden="true" />
                     {[15, 30, 60, 300].map((sec) => (
                       <button
                         key={sec}
                         type="button"
-                        onClick={() => setAutoDestructSeconds(sec)}
-                        className={`px-2 py-0.5 rounded-lg font-mono text-[11px] transition cursor-pointer ${
+                        onClick={() => {
+                          setAutoDestructSeconds(sec);
+                          announce(`Photo will auto-destruct after ${sec} seconds.`, 'polite');
+                        }}
+                        className={`px-2 py-0.5 rounded-lg font-mono text-[11px] transition cursor-pointer focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:outline-none ${
                           autoDestructSeconds === sec
                             ? 'bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40'
                             : 'hover:text-zinc-200 text-zinc-400'
                         }`}
+                        aria-pressed={autoDestructSeconds === sec}
+                        aria-label={`${sec < 60 ? `${sec} seconds` : `${sec / 60} minutes`}`}
                       >
                         {sec < 60 ? `${sec}s` : `${sec / 60}m`}
                       </button>
@@ -348,15 +421,22 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
                 )}
               </div>
 
-              {/* Optional ephemeral caption */}
-              <input
-                type="text"
-                value={caption}
-                onChange={(e) => setCaption(e.target.value)}
-                maxLength={100}
-                placeholder="Add an optional ephemeral caption..."
-                className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-emerald-500/80 transition"
-              />
+              {/* Accessible Alt Text / Photo Caption */}
+              <div className="space-y-1">
+                <label htmlFor="photo-caption-input" className="block text-xs font-medium text-zinc-300">
+                  Audio description / Alt text (for screen readers):
+                </label>
+                <input
+                  id="photo-caption-input"
+                  ref={captionInputRef}
+                  type="text"
+                  value={caption}
+                  onChange={(e) => setCaption(e.target.value)}
+                  maxLength={100}
+                  placeholder="Describe this photo for the recipient (e.g. document text, selfie, surroundings)..."
+                  className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-emerald-500/80 focus-visible:ring-2 focus-visible:ring-emerald-400 transition"
+                />
+              </div>
 
               {/* Action Buttons: Retake vs Send */}
               <div className="flex gap-2">
@@ -364,9 +444,10 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
                   type="button"
                   onClick={handleRetake}
                   disabled={isSending}
-                  className="flex-1 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium text-xs transition cursor-pointer flex items-center justify-center gap-1.5"
+                  className="flex-1 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium text-xs transition cursor-pointer flex items-center justify-center gap-1.5 focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:outline-none"
+                  aria-label="Retake photo"
                 >
-                  <RefreshCw className="w-3.5 h-3.5" />
+                  <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" />
                   <span>Retake</span>
                 </button>
 
@@ -374,13 +455,14 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
                   type="button"
                   onClick={handleSend}
                   disabled={isSending}
-                  className="flex-1 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-zinc-950 font-bold text-xs transition cursor-pointer flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-500/20 active:scale-[0.98]"
+                  className="flex-1 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-zinc-950 font-bold text-xs transition cursor-pointer flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-500/20 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:outline-none"
+                  aria-label="Send encrypted photo"
                 >
                   {isSending ? (
                     <span>Encrypting & Sending...</span>
                   ) : (
                     <>
-                      <Check className="w-4 h-4" />
+                      <Check className="w-4 h-4" aria-hidden="true" />
                       <span>Send Encrypted Photo</span>
                     </>
                   )}
@@ -393,22 +475,25 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="w-11 h-11 rounded-2xl bg-zinc-800/80 text-zinc-400 hover:text-zinc-100 flex items-center justify-center transition border border-zinc-700/60 cursor-pointer"
-                title="Select from gallery or device"
+                className="w-11 h-11 rounded-2xl bg-zinc-800/80 text-zinc-400 hover:text-zinc-100 flex items-center justify-center transition border border-zinc-700/60 cursor-pointer focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:outline-none"
+                title="Select photo from device library"
+                aria-label="Select photo from device library"
               >
-                <Upload className="w-4 h-4" />
+                <Upload className="w-4 h-4" aria-hidden="true" />
               </button>
 
               {/* Big Shutter Button */}
               <button
+                ref={shutterRef}
                 type="button"
                 onClick={handleSnap}
                 disabled={isInitializing || !!cameraError}
-                className="w-16 h-16 rounded-full border-4 border-emerald-400/30 p-1 flex items-center justify-center group active:scale-95 transition cursor-pointer disabled:opacity-30"
-                title="Take Photo"
+                className="w-16 h-16 rounded-full border-4 border-emerald-400/30 p-1 flex items-center justify-center group active:scale-95 transition cursor-pointer disabled:opacity-30 focus-visible:ring-4 focus-visible:ring-emerald-400 focus-visible:outline-none"
+                title="Capture Photo (Spacebar or Enter)"
+                aria-label="Capture photo (Spacebar or Enter)"
               >
                 <div className="w-full h-full rounded-full bg-emerald-500 group-hover:bg-emerald-400 transition shadow-lg shadow-emerald-500/30 flex items-center justify-center">
-                  <Camera className="w-6 h-6 text-zinc-950" />
+                  <Camera className="w-6 h-6 text-zinc-950" aria-hidden="true" />
                 </div>
               </button>
 
@@ -417,10 +502,11 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
                 type="button"
                 onClick={handleToggleFacingMode}
                 disabled={isInitializing || !!cameraError}
-                className="w-11 h-11 rounded-2xl bg-zinc-800/80 text-zinc-400 hover:text-zinc-100 flex items-center justify-center transition border border-zinc-700/60 cursor-pointer disabled:opacity-30"
-                title="Flip Camera"
+                className="w-11 h-11 rounded-2xl bg-zinc-800/80 text-zinc-400 hover:text-zinc-100 flex items-center justify-center transition border border-zinc-700/60 cursor-pointer disabled:opacity-30 focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:outline-none"
+                title="Switch Camera (Front or Rear)"
+                aria-label={`Switch camera. Currently facing ${facingMode === 'environment' ? 'rear' : 'front'}`}
               >
-                <RefreshCw className="w-4 h-4" />
+                <RefreshCw className="w-4 h-4" aria-hidden="true" />
               </button>
             </div>
           )}
