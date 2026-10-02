@@ -36,7 +36,7 @@ export function usePWAInstall() {
         hasAnnouncedPromptRef.current = true;
         setTimeout(() => {
           playInstallPromptChime();
-          const message = 'PrivChat is available to download to your home screen. Press Alt plus I or activate Install App.';
+          const message = 'PrivaChat is available to download to your home screen. Press Alt plus I or activate Install App.';
           announce(message, 'polite');
           speakVoicePrompt(message);
         }, 1200);
@@ -47,7 +47,7 @@ export function usePWAInstall() {
       setIsInstalled(true);
       setDeferredPrompt(null);
       playInstallSuccess();
-      const message = 'Private Ephemeral Chat was successfully installed to your home screen.';
+      const message = 'PrivaChat was successfully installed to your home screen.';
       announce(message, 'assertive');
       speakVoicePrompt(message);
     };
@@ -67,12 +67,12 @@ export function usePWAInstall() {
         return false;
       }
       if (isInstalled) {
-        const msg = 'PrivChat is already installed and running as a standalone app.';
+        const msg = 'PrivaChat is already installed and running as a standalone app.';
         announce(msg, 'polite');
         speakVoicePrompt(msg);
         return false;
       }
-      const msg = 'To install PrivChat, use your browser menu or check your address bar for the install icon.';
+      const msg = 'To install PrivaChat, use your browser menu or check your address bar for the install icon.';
       announce(msg, 'polite');
       speakVoicePrompt(msg);
       return false;
@@ -87,7 +87,7 @@ export function usePWAInstall() {
         setIsInstalled(true);
         setDeferredPrompt(null);
         playInstallSuccess();
-        const successMsg = 'PrivChat has been successfully installed. You can now open it directly from your device home screen.';
+        const successMsg = 'PrivaChat has been successfully installed. You can now open it directly from your device home screen.';
         announce(successMsg, 'assertive');
         speakVoicePrompt(successMsg);
         return true;

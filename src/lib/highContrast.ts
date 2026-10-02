@@ -7,12 +7,14 @@
  * with thick borders and high-visibility focus indicators.
  */
 
-const HIGH_CONTRAST_STORAGE_KEY = 'privchat_high_contrast';
+const HIGH_CONTRAST_STORAGE_KEY = 'privachat_high_contrast';
+const LEGACY_HIGH_CONTRAST_STORAGE_KEY = 'privchat_high_contrast';
 
 export function isHighContrastEnabled(): boolean {
   if (typeof window === 'undefined') return false;
   try {
-    return localStorage.getItem(HIGH_CONTRAST_STORAGE_KEY) === 'true';
+    const val = localStorage.getItem(HIGH_CONTRAST_STORAGE_KEY) ?? localStorage.getItem(LEGACY_HIGH_CONTRAST_STORAGE_KEY);
+    return val === 'true';
   } catch {
     return false;
   }

@@ -7,12 +7,13 @@
  * to complement screen reader announcements and earcons.
  */
 
-const VOICE_STORAGE_KEY = 'privchat_voice_prompts_enabled';
+const VOICE_STORAGE_KEY = 'privachat_voice_prompts_enabled';
+const LEGACY_VOICE_STORAGE_KEY = 'privchat_voice_prompts_enabled';
 
 export function isVoicePromptsEnabled(): boolean {
   if (typeof window === 'undefined') return true;
   try {
-    const val = localStorage.getItem(VOICE_STORAGE_KEY);
+    const val = localStorage.getItem(VOICE_STORAGE_KEY) ?? localStorage.getItem(LEGACY_VOICE_STORAGE_KEY);
     return val === null ? true : val === 'true';
   } catch {
     return true;

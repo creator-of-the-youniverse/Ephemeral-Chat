@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { DoorClosed, Shield, User, ArrowRight, Key } from 'lucide-react';
+import { DoorClosed, Shield, User, ArrowRight, Key, MessageSquare } from 'lucide-react';
 import { announce } from '../lib/announcer';
 
 interface LandingViewProps {
-  onCreateRoom: (hostName: string) => Promise<string>;
+  onCreateRoom: (hostName: string, draftMessage?: string) => Promise<string>;
   isLoading?: boolean;
   error?: string | null;
 }
@@ -11,9 +11,12 @@ interface LandingViewProps {
 export const LandingView: React.FC<LandingViewProps> = ({ onCreateRoom, isLoading, error }) => {
   const [step, setStep] = useState<'intro' | 'name'>('intro');
   const [hostName, setHostName] = useState('');
+  const [draftMessage, setDraftMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const [showOnboarding, setShowOnboarding] = useState(() => localStorage.getItem('privchat_onboarding_seen') !== 'true');
+  const [showOnboarding, setShowOnboarding] = useState(() => {
+    return localStorage.getItem('privachat_onboarding_seen') !== 'true' && localStorage.getItem('privchat_onboarding_seen') !== 'true';
+  });
 
   useEffect(() => {
     announce(
@@ -24,7 +27,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onCreateRoom, isLoadin
 
   const handleGoToName = () => {
     setStep('name');
-    announce('Choose your display name for the private room.', 'polite');
+    announce('Choose your display name and optionally draft an opening message for the private room.', 'polite');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -36,17 +39,20 @@ export const LandingView: React.FC<LandingViewProps> = ({ onCreateRoom, isLoadin
     setSubmitting(true);
     setFormError(null);
     try {
-      await onCreateRoom(hostName.trim());
+      await onCreateRoom(hostName.trim(), draftMessage.trim());
     } catch (err: any) {
       setFormError(err.message || 'Failed to open private room.');
       setSubmitting(false);
     }
   };
 
-  const closeOnboarding = () => { localStorage.setItem("privchat_onboarding_seen", "true"); setShowOnboarding(false); };
+  const closeOnboarding = () => {
+    localStorage.setItem("privachat_onboarding_seen", "true");
+    setShowOnboarding(false);
+  };
   return (
     <>
-    {showOnboarding && <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"><div className="w-full max-w-sm rounded-2xl bg-zinc-900 border border-zinc-700 p-6 shadow-2xl text-left"><h2 className="text-xl font-semibold text-zinc-100 mb-2">Welcome to PrivChat</h2><p className="text-sm text-zinc-400 mb-4">Private, temporary chat for two people. No account. No chat history.</p><div className="space-y-2 text-sm text-zinc-300 mb-5"><p>1. Create a room and share the private link.</p><p>2. Your guest enters their name and knocks.</p><p>3. Open the door and chat.</p><p>4. When both end the chat, the conversation is destroyed.</p></div><div className="rounded-xl bg-zinc-950 border border-zinc-800 p-3 text-xs text-zinc-400 mb-5"><span className="font-semibold text-zinc-200">Install PrivChat:</span> Android/Chrome: use the browser install prompt or menu. iPhone/iPad: Safari → Share → Add to Home Screen. Desktop: use the install icon/menu when available.</div><button onClick={closeOnboarding} className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-semibold text-sm">Got it</button></div></div>}
+    {showOnboarding && <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"><div className="w-full max-w-sm rounded-2xl bg-zinc-900 border border-zinc-700 p-6 shadow-2xl text-left"><h2 className="text-xl font-semibold text-zinc-100 mb-2">Welcome to PrivaChat</h2><p className="text-sm text-zinc-400 mb-4">Private, temporary chat for two people. No account. No chat history.</p><div className="space-y-2 text-sm text-zinc-300 mb-5"><p>1. Create a room and share the private link.</p><p>2. Your guest enters their name and knocks.</p><p>3. Open the door and chat.</p><p>4. When both end the chat, the conversation is destroyed.</p></div><div className="rounded-xl bg-zinc-950 border border-zinc-800 p-3 text-xs text-zinc-400 mb-5"><span className="font-semibold text-zinc-200">Install PrivaChat:</span> Android/Chrome: use the browser install prompt or menu. iPhone/iPad: Safari → Share → Add to Home Screen. Desktop: use the install icon/menu when available.</div><button onClick={closeOnboarding} className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-semibold text-sm">Got it</button></div></div>}
     <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 max-w-lg mx-auto w-full text-center my-auto">
       {/* Visual Door Emblem */}
       <div className="relative mb-6">
@@ -110,8 +116,8 @@ export const LandingView: React.FC<LandingViewProps> = ({ onCreateRoom, isLoadin
         </div>
       ) : (
         /* Name Choice Screen */
-        <form onSubmit={handleSubmit} className="w-full space-y-5 animate-fade-in text-left">
-          <div className="text-center space-y-1.5">
+        <form onSubmit={handleSubmit} className="w-full space-y-4 animate-fade-in text-left">
+          <div className="text-center space-y-1">
             <h2 className="text-xl sm:text-2xl font-semibold text-zinc-100">
               Choose your display name
             </h2>
@@ -120,7 +126,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onCreateRoom, isLoadin
             </p>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <label htmlFor="hostNameInput" className="block text-xs font-medium text-zinc-300">
               Your name:
             </label>
@@ -138,9 +144,32 @@ export const LandingView: React.FC<LandingViewProps> = ({ onCreateRoom, isLoadin
                 required
                 aria-required="true"
                 autoFocus
-                className="w-full pl-10 pr-4 py-3 rounded-xl bg-zinc-900 border border-zinc-700/80 text-zinc-100 placeholder-zinc-500 text-sm focus:outline-none focus:border-emerald-500 focus-visible:ring-2 focus-visible:ring-emerald-400 transition"
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-zinc-900 border border-zinc-700/80 text-zinc-100 placeholder-zinc-500 text-sm focus:outline-none focus:border-emerald-500 focus-visible:ring-2 focus-visible:ring-emerald-400 transition"
               />
             </div>
+          </div>
+
+          {/* Draft an opening message / invite note */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label htmlFor="draftMessageInput" className="block text-xs font-medium text-zinc-300 flex items-center gap-1.5">
+                <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Draft an opening message:</span>
+              </label>
+              <span className="text-[11px] text-zinc-500">Optional</span>
+            </div>
+            <textarea
+              id="draftMessageInput"
+              value={draftMessage}
+              onChange={(e) => setDraftMessage(e.target.value)}
+              placeholder="e.g. Hey! Join me in this private room to talk about our plans..."
+              maxLength={500}
+              rows={2}
+              className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-700/80 text-zinc-100 placeholder-zinc-500 text-sm focus:outline-none focus:border-emerald-500 focus-visible:ring-2 focus-visible:ring-emerald-400 transition resize-none"
+            />
+            <p className="text-[11px] text-zinc-400">
+              Included when sending the room invite, and pre-loaded in your chat as soon as the door opens.
+            </p>
           </div>
 
           {(formError || error) && (
@@ -149,7 +178,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onCreateRoom, isLoadin
             </div>
           )}
 
-          <div className="space-y-2 pt-2">
+          <div className="space-y-2 pt-1">
             <button
               type="submit"
               disabled={submitting || isLoading || !hostName.trim()}
@@ -169,7 +198,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onCreateRoom, isLoadin
             <button
               type="button"
               onClick={() => setStep('intro')}
-              className="w-full py-2.5 text-xs text-zinc-400 hover:text-zinc-200 transition focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:outline-none rounded-lg"
+              className="w-full py-2 text-xs text-zinc-400 hover:text-zinc-200 transition focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:outline-none rounded-lg cursor-pointer"
             >
               Back to overview
             </button>

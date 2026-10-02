@@ -23,12 +23,13 @@ function getAudioContext(): AudioContext | null {
 }
 
 // Master sound toggle state (persisted in localStorage)
-const STORAGE_KEY = 'privchat_audio_feedback_enabled';
+const STORAGE_KEY = 'privachat_audio_feedback_enabled';
+const LEGACY_STORAGE_KEY = 'privchat_audio_feedback_enabled';
 
 export function isSoundEnabled(): boolean {
   if (typeof window === 'undefined') return true;
   try {
-    const val = localStorage.getItem(STORAGE_KEY);
+    const val = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
     return val === null ? true : val === 'true';
   } catch {
     return true;

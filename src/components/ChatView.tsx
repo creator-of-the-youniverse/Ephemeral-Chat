@@ -17,6 +17,8 @@ interface ChatViewProps {
   peerTyping: boolean;
   otherParticipantEndedNotice: string | null;
   onUpdateTimer: (seconds: number) => void;
+  initialDraftMessage?: string;
+  onClearDraftMessage?: () => void;
 }
 
 export const ChatView: React.FC<ChatViewProps> = ({
@@ -29,8 +31,10 @@ export const ChatView: React.FC<ChatViewProps> = ({
   peerTyping,
   otherParticipantEndedNotice,
   onUpdateTimer,
+  initialDraftMessage = '',
+  onClearDraftMessage,
 }) => {
-  const [inputText, setInputText] = useState('');
+  const [inputText, setInputText] = useState(initialDraftMessage);
   const [selectedTimer, setSelectedTimer] = useState<number>(roomData.autoDestructSeconds || 0);
   const [showTimerMenu, setShowTimerMenu] = useState(false);
   const [now, setNow] = useState(Date.now());
@@ -44,6 +48,14 @@ export const ChatView: React.FC<ChatViewProps> = ({
   const myEnded = isHost ? roomData.hostEnded : roomData.guestEnded;
   const otherEnded = isHost ? roomData.guestEnded : roomData.hostEnded;
   const otherName = isHost ? roomData.guestName || 'Guest' : roomData.hostName;
+
+  // Auto-resize if initialDraftMessage is present on mount
+  useEffect(() => {
+    if (initialDraftMessage && inputRef.current) {
+      inputRef.current.style.height = 'auto';
+      inputRef.current.style.height = `${Math.min(inputRef.current.scrollHeight, 128)}px`;
+    }
+  }, [initialDraftMessage]);
 
   // Periodic tick for self-destruct timers
   useEffect(() => {
@@ -62,6 +74,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
     const text = inputText;
     setInputText('');
+    onClearDraftMessage?.();
     onSendTyping(false);
 
     await onSendMessage(text, selectedTimer);

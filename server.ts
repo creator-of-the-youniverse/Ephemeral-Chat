@@ -437,6 +437,35 @@ async function startServer() {
     return res.json({ success: true });
   });
 
+  // Clear all messages in room (Emergency Panic Wipe)
+  app.post('/api/rooms/:roomId/clear', (req, res) => {
+    const { roomId } = req.params;
+    const room = rooms.get(roomId);
+    if (!room) return res.status(404).json({ error: 'Room not found.' });
+
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (token !== room.hostToken && token !== room.guestToken) {
+      return res.status(403).json({ error: 'Unauthorized.' });
+    }
+
+    for (const msg of room.messages) {
+      const timer = messageDestructTimers.get(msg.id);
+      if (timer) {
+        clearTimeout(timer);
+        messageDestructTimers.delete(msg.id);
+      }
+    }
+    room.messages = [];
+
+    broadcastToRoom(roomId, {
+      type: 'HISTORY_CLEARED',
+      clearedBy: token === room.hostToken ? 'host' : 'guest',
+      clearedByName: token === room.hostToken ? room.hostName : (room.guestName || 'Guest'),
+    });
+
+    return res.json({ success: true });
+  });
+
   // End side of conversation (Two-Sided Termination Model)
   app.post('/api/rooms/:roomId/end', (req, res) => {
     const { roomId } = req.params;
@@ -686,6 +715,25 @@ async function startServer() {
             broadcastToRoom(roomId, {
               type: 'MESSAGE_DESTRUCTED',
               messageId: msgId,
+            });
+          }
+        }
+
+        // Clear all history signal
+        if (data.type === 'CLEAR_HISTORY') {
+          if (currentRoom) {
+            for (const msg of currentRoom.messages) {
+              const timer = messageDestructTimers.get(msg.id);
+              if (timer) {
+                clearTimeout(timer);
+                messageDestructTimers.delete(msg.id);
+              }
+            }
+            currentRoom.messages = [];
+            broadcastToRoom(roomId, {
+              type: 'HISTORY_CLEARED',
+              clearedBy: role,
+              clearedByName: isHost ? currentRoom.hostName : (currentRoom.guestName || 'Guest'),
             });
           }
         }

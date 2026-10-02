@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
-import { Volume2, VolumeX, Keyboard, Eye, Shield, Check, X, Mic, Download, Contrast, Smartphone } from 'lucide-react';
+import { Volume2, VolumeX, Keyboard, Eye, Shield, Check, X, Mic, Download, Contrast, Smartphone, Activity } from 'lucide-react';
+import { ShakeAction } from '../lib/shake';
 
 interface AccessibilityModalProps {
   isOpen: boolean;
@@ -12,6 +13,11 @@ interface AccessibilityModalProps {
   onToggleHighContrast: () => void;
   hapticEnabled: boolean;
   onToggleHaptic: () => void;
+  shakeEnabled: boolean;
+  onToggleShake: () => void;
+  shakeAction: ShakeAction;
+  onChangeShakeAction: (action: ShakeAction) => void;
+  onTestShakeHaptic: () => void;
 }
 
 export const AccessibilityModal: React.FC<AccessibilityModalProps> = ({
@@ -25,6 +31,11 @@ export const AccessibilityModal: React.FC<AccessibilityModalProps> = ({
   onToggleHighContrast,
   hapticEnabled,
   onToggleHaptic,
+  shakeEnabled,
+  onToggleShake,
+  shakeAction,
+  onChangeShakeAction,
+  onTestShakeHaptic,
 }) => {
   const modalRef = useRef<HTMLDivElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -167,6 +178,100 @@ export const AccessibilityModal: React.FC<AccessibilityModalProps> = ({
           </div>
         </div>
 
+        {/* Device Shake Panic Gesture Toggle & Action */}
+        <div className="py-3.5 border-b border-zinc-800 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <span className="text-sm font-medium text-zinc-100 flex items-center gap-2">
+                <Activity className="w-4 h-4 text-emerald-400" />
+                <span>Device Shake Gesture (Panic Wipe)</span>
+              </span>
+              <p className="text-xs text-zinc-400">
+                Physically shake your phone to trigger an immediate panic wipe or end conversation, confirmed via Haptic API tactile vibrations.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              role="switch"
+              aria-checked={shakeEnabled}
+              onClick={onToggleShake}
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus-visible:ring-2 focus-visible:ring-emerald-400 ${
+                shakeEnabled ? 'bg-emerald-500' : 'bg-zinc-700'
+              }`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  shakeEnabled ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+
+          {shakeEnabled && (
+            <div className="space-y-2 pt-1">
+              <label className="block text-xs font-medium text-zinc-300">
+                Action on Shake:
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 text-xs">
+                <button
+                  type="button"
+                  onClick={() => onChangeShakeAction('end_chat')}
+                  className={`p-2.5 rounded-xl border text-left transition cursor-pointer flex flex-col gap-0.5 ${
+                    shakeAction === 'end_chat'
+                      ? 'bg-emerald-500/10 border-emerald-500 text-emerald-300 font-semibold'
+                      : 'bg-zinc-950/60 border-zinc-800 text-zinc-400 hover:text-zinc-200'
+                  }`}
+                >
+                  <span className="text-zinc-100 font-semibold">Immediate End Chat</span>
+                  <span className="text-[10px] text-zinc-500 font-normal">Close & wipe conversation</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => onChangeShakeAction('clear_history')}
+                  className={`p-2.5 rounded-xl border text-left transition cursor-pointer flex flex-col gap-0.5 ${
+                    shakeAction === 'clear_history'
+                      ? 'bg-emerald-500/10 border-emerald-500 text-emerald-300 font-semibold'
+                      : 'bg-zinc-950/60 border-zinc-800 text-zinc-400 hover:text-zinc-200'
+                  }`}
+                >
+                  <span className="text-zinc-100 font-semibold">Clear History</span>
+                  <span className="text-[10px] text-zinc-500 font-normal">Wipe messages now</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => onChangeShakeAction('prompt_end')}
+                  className={`p-2.5 rounded-xl border text-left transition cursor-pointer flex flex-col gap-0.5 ${
+                    shakeAction === 'prompt_end'
+                      ? 'bg-emerald-500/10 border-emerald-500 text-emerald-300 font-semibold'
+                      : 'bg-zinc-950/60 border-zinc-800 text-zinc-400 hover:text-zinc-200'
+                  }`}
+                >
+                  <span className="text-zinc-100 font-semibold">Confirm Dialog</span>
+                  <span className="text-[10px] text-zinc-500 font-normal">Show end confirmation</span>
+                </button>
+              </div>
+
+              <div className="pt-1.5 flex items-center justify-between">
+                <span className="text-[11px] text-zinc-500">
+                  Shortcut: <kbd className="font-mono bg-zinc-800 px-1.5 py-0.5 rounded text-emerald-400">Alt + K</kbd>
+                </span>
+                <button
+                  type="button"
+                  onClick={onTestShakeHaptic}
+                  className="px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium transition cursor-pointer flex items-center gap-1.5"
+                  aria-label="Test shake haptic vibration pattern"
+                >
+                  <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Test Shake Vibration</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Audio Earcons Toggle */}
         <div className="py-3.5 border-b border-zinc-800 space-y-2">
           <div className="flex items-center justify-between">
@@ -290,6 +395,11 @@ export const AccessibilityModal: React.FC<AccessibilityModalProps> = ({
             </div>
 
             <div className="p-2.5 rounded-xl bg-zinc-950/60 border border-zinc-800 flex items-center justify-between">
+              <dt className="text-zinc-300">Shake Gesture Panic Wipe</dt>
+              <dd className="font-mono bg-zinc-800 px-2 py-0.5 rounded text-emerald-400">Alt + K</dd>
+            </div>
+
+            <div className="p-2.5 rounded-xl bg-zinc-950/60 border border-zinc-800 flex items-center justify-between">
               <dt className="text-zinc-300">Shutter / Snap Photo</dt>
               <dd className="font-mono bg-zinc-800 px-2 py-0.5 rounded text-emerald-400">Space</dd>
             </div>
@@ -303,6 +413,7 @@ export const AccessibilityModal: React.FC<AccessibilityModalProps> = ({
             <span>Screen Reader & Tactile Features:</span>
           </h3>
           <ul className="list-disc pl-5 space-y-1 text-zinc-400">
+            <li><strong className="text-zinc-200">Device Shake Panic Wipe:</strong> Deliberately shaking your phone triggers an immediate end conversation or clear history panic wipe, accompanied by urgent Haptic API tactile pulses.</li>
             <li><strong className="text-zinc-200">Tactile Haptics:</strong> Dynamic vibration pulses for button presses, message arrivals, knocks, and shutters so you feel physical confirmation.</li>
             <li><strong className="text-zinc-200">High Contrast Mode:</strong> Pure white text on solid black with 2px thick white borders and high-visibility focus indicators.</li>
             <li><strong className="text-zinc-200">Voice-Guided PWA Installation:</strong> Spoken audio voice prompts announce when the app is ready to download, guide iOS Safari installation, and confirm completion.</li>

@@ -289,6 +289,16 @@ export function useEphemeralRoom() {
             });
             break;
 
+          case 'HISTORY_CLEARED':
+            playDestruct();
+            hapticDestruct();
+            announce(
+              `${data.clearedByName || 'Participant'} has cleared all message history.`,
+              'assertive'
+            );
+            setRoomData((prev) => (prev ? { ...prev, messages: [] } : null));
+            break;
+
           case 'PRESENCE_CHANGE':
             setRoomData((prev) => {
               if (!prev) return null;
@@ -817,6 +827,26 @@ export function useEphemeralRoom() {
     });
   };
 
+  // Action: Clear all conversation history immediately
+  const clearHistory = async () => {
+    if (!roomId || !token) return;
+
+    playDestruct();
+    hapticDestruct();
+    announce('Conversation history has been cleared.', 'assertive');
+
+    setRoomData((prev) => (prev ? { ...prev, messages: [] } : null));
+
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'CLEAR_HISTORY' }));
+    } else {
+      fetch(`/api/rooms/${roomId}/clear`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      }).catch(() => {});
+    }
+  };
+
   // Action: End my side (Two-sided termination model)
   const endMySide = async () => {
     if (!roomId || !token) return;
@@ -930,6 +960,7 @@ export function useEphemeralRoom() {
     sendMessage,
     sendImageMessage,
     destroyMessage,
+    clearHistory,
     endMySide,
     updateSettings,
     sendTyping,

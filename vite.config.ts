@@ -20,7 +20,7 @@ export default defineConfig(() => {
         manifest: {
           id: '/',
           name: 'Private Ephemeral Chat',
-          short_name: 'PrivChat',
+          short_name: 'PrivaChat',
           description: 'A private, temporary, two-person PWA chat with knock-to-enter waiting room, ephemeral messaging, and mutual end-chat destruction.',
           theme_color: '#18181b',
           background_color: '#09090b',

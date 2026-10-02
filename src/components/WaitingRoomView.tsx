@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { DoorClosed, User, ArrowRight } from 'lucide-react';
+import { DoorClosed, User, ArrowRight, MessageSquare } from 'lucide-react';
 import { RoomData } from '../types';
 import { announce } from '../lib/announcer';
 
@@ -22,16 +22,34 @@ export const WaitingRoomView: React.FC<WaitingRoomViewProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
+  // Extract optional note from URL hash or query
+  const [inviteNote] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      if (window.location.hash) {
+        const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+        const msg = hashParams.get('msg');
+        if (msg) return decodeURIComponent(msg);
+      }
+      const searchParams = new URLSearchParams(window.location.search);
+      const qMsg = searchParams.get('msg');
+      if (qMsg) return decodeURIComponent(qMsg);
+    } catch {
+      // ignore
+    }
+    return null;
+  });
+
   const hostName = roomData?.hostName || 'Host';
 
   useEffect(() => {
     if (!hasKnocked) {
-      announce(
-        `You have been invited to a private room hosted by ${hostName}. Enter your display name and knock on the door to enter.`,
-        'polite'
-      );
+      const announcement = inviteNote
+        ? `You have been invited to a private room hosted by ${hostName}. Note from ${hostName}: "${inviteNote}". Enter your display name and knock on the door to enter.`
+        : `You have been invited to a private room hosted by ${hostName}. Enter your display name and knock on the door to enter.`;
+      announce(announcement, 'polite');
     }
-  }, [hasKnocked, hostName]);
+  }, [hasKnocked, hostName, inviteNote]);
 
   const handleKnockSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,6 +96,19 @@ export const WaitingRoomView: React.FC<WaitingRoomViewProps> = ({
               Hosted by <span className="text-emerald-400 font-semibold">{hostName}</span>. Choose your name and knock to be admitted.
             </p>
           </div>
+
+          {/* Opening Note from Host if present */}
+          {inviteNote && (
+            <div className="p-3.5 rounded-2xl bg-zinc-900/90 border border-emerald-500/30 text-left space-y-1 animate-fade-in shadow-lg shadow-emerald-500/5">
+              <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-400 flex items-center gap-1.5">
+                <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Message from {hostName}</span>
+              </span>
+              <p className="text-xs text-zinc-200 leading-relaxed italic">
+                "{inviteNote}"
+              </p>
+            </div>
+          )}
 
           <form onSubmit={handleKnockSubmit} className="space-y-4 pt-1">
             <div className="space-y-2">

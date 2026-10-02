@@ -19,6 +19,15 @@ import { isSoundEnabled, setSoundEnabled } from './lib/sound';
 import { isVoicePromptsEnabled, setVoicePromptsEnabled, speakVoicePrompt } from './lib/speech';
 import { isHighContrastEnabled, setHighContrastEnabled } from './lib/highContrast';
 import { isHapticEnabled, setHapticEnabled, triggerHaptic } from './lib/haptic';
+import {
+  isShakeEnabled,
+  setShakeEnabled,
+  getShakeAction,
+  setShakeAction,
+  testShakeHaptic,
+  ShakeAction,
+} from './lib/shake';
+import { useDeviceShake } from './hooks/useDeviceShake';
 import { announce } from './lib/announcer';
 import { DoorClosed, Eye, Volume2, VolumeX } from 'lucide-react';
 
@@ -42,6 +51,7 @@ export default function App() {
     sendMessage,
     sendImageMessage,
     destroyMessage,
+    clearHistory,
     endMySide,
     updateSettings,
     sendTyping,
@@ -57,6 +67,29 @@ export default function App() {
   const [voiceEnabled, setVoiceEnabledState] = useState<boolean>(() => isVoicePromptsEnabled());
   const [highContrastEnabled, setHighContrastEnabledState] = useState<boolean>(() => isHighContrastEnabled());
   const [hapticEnabled, setHapticEnabledState] = useState<boolean>(() => isHapticEnabled());
+  const [shakeEnabled, setShakeEnabledState] = useState<boolean>(() => isShakeEnabled());
+  const [shakeAction, setShakeActionState] = useState<ShakeAction>(() => getShakeAction());
+  const [draftMessage, setDraftMessage] = useState<string>('');
+
+  const isRoomActiveOrEnded = (status === 'ACTIVE' || status === 'ENDED') && !!roomData;
+  const { shakeToast } = useDeviceShake({
+    onEndChat: endMySide,
+    onClearHistory: clearHistory,
+    onOpenEndModal: () => setIsEndModalOpen(true),
+    active: isRoomActiveOrEnded,
+  });
+
+  const handleCreateRoom = useCallback(async (hostName: string, initialDraftMessage?: string) => {
+    if (initialDraftMessage) {
+      setDraftMessage(initialDraftMessage);
+    }
+    return await createRoom(hostName);
+  }, [createRoom]);
+
+  const handleResetToLanding = useCallback(() => {
+    setDraftMessage('');
+    resetToLanding();
+  }, [resetToLanding]);
 
   const handleToggleSound = useCallback(() => {
     setSoundEnabledState((prev) => {
@@ -110,6 +143,37 @@ export default function App() {
       speakVoicePrompt(msg);
       return next;
     });
+  }, []);
+
+  const handleToggleShake = useCallback(() => {
+    setShakeEnabledState((prev) => {
+      const next = !prev;
+      setShakeEnabled(next);
+      if (next) {
+        testShakeHaptic();
+      }
+      const msg = next
+        ? 'Device shake panic wipe enabled.'
+        : 'Device shake panic wipe disabled.';
+      announce(msg, 'polite');
+      speakVoicePrompt(msg);
+      return next;
+    });
+  }, []);
+
+  const handleChangeShakeAction = useCallback((action: ShakeAction) => {
+    setShakeActionState(action);
+    setShakeAction(action);
+    testShakeHaptic();
+    const actionLabel =
+      action === 'end_chat'
+        ? 'Immediate End Chat'
+        : action === 'clear_history'
+        ? 'Clear All Messages'
+        : 'Open End Chat Confirmation';
+    const msg = `Shake gesture action set to: ${actionLabel}.`;
+    announce(msg, 'polite');
+    speakVoicePrompt(msg);
   }, []);
 
   // Global Keyboard Shortcuts for complete blind accessibility:
@@ -183,7 +247,7 @@ export default function App() {
         </a>
         <div id="destroyed-content" className="w-full flex flex-col items-center justify-center">
           <DestroyedNotice
-            onStartNew={resetToLanding}
+            onStartNew={handleResetToLanding}
             message={error || 'The private room has been permanently destroyed.'}
             isExpiredOrNonExistent={!!error}
           />
@@ -200,6 +264,11 @@ export default function App() {
           onToggleHighContrast={handleToggleHighContrast}
           hapticEnabled={hapticEnabled}
           onToggleHaptic={handleToggleHaptic}
+          shakeEnabled={shakeEnabled}
+          onToggleShake={handleToggleShake}
+          shakeAction={shakeAction}
+          onChangeShakeAction={handleChangeShakeAction}
+          onTestShakeHaptic={testShakeHaptic}
         />
       </main>
     );
@@ -230,25 +299,30 @@ export default function App() {
         />
       ) : (
         /* Top Navigation Header for Landing Screen */
-        <header role="banner" className="w-full border-b border-zinc-800/80 bg-zinc-950/90 safe-top px-3 py-2.5 sm:px-6">
-          <div className="max-w-3xl mx-auto flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
+        <header role="banner" className="w-full border-b border-zinc-800/80 bg-zinc-950/95 backdrop-blur-md safe-top px-3 py-2 sm:px-6 sm:py-2.5">
+          <div className="max-w-3xl mx-auto flex items-center justify-between gap-2 sm:gap-3">
+            <div className="flex items-center gap-2 min-w-0">
               <div
-                className="w-8 h-8 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-emerald-400"
+                className="w-8 h-8 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-emerald-400 shadow-inner flex-shrink-0"
                 aria-hidden="true"
               >
                 <DoorClosed className="w-4 h-4" />
               </div>
-              <span className="font-semibold text-xs sm:text-sm text-zinc-100">
-                PrivChat
-              </span>
+              <div className="flex items-baseline gap-2 min-w-0">
+                <span className="font-semibold text-sm text-zinc-100 tracking-tight">
+                  PrivaChat
+                </span>
+                <span className="hidden sm:inline text-xs text-zinc-500">
+                  Ephemeral 2-Person Chat
+                </span>
+              </div>
             </div>
 
-            <div className="flex items-center gap-1.5 sm:gap-2" role="toolbar" aria-label="Accessibility & App Controls">
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0" role="toolbar" aria-label="Accessibility & App Controls">
               {/* Sound Cues Toggle */}
               <button
                 onClick={handleToggleSound}
-                className={`p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg border text-xs flex items-center gap-1 transition cursor-pointer focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:outline-none ${
+                className={`h-9 w-9 sm:h-auto sm:w-auto p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg border text-xs flex items-center justify-center gap-1.5 transition cursor-pointer focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:outline-none ${
                   soundEnabled
                     ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20'
                     : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
@@ -258,9 +332,9 @@ export default function App() {
                 aria-pressed={soundEnabled}
               >
                 {soundEnabled ? (
-                  <Volume2 className="w-4 h-4 text-emerald-400" aria-hidden="true" />
+                  <Volume2 className="w-4 h-4 text-emerald-400 flex-shrink-0" aria-hidden="true" />
                 ) : (
-                  <VolumeX className="w-4 h-4 text-zinc-500" aria-hidden="true" />
+                  <VolumeX className="w-4 h-4 text-zinc-500 flex-shrink-0" aria-hidden="true" />
                 )}
                 <span className="hidden sm:inline">{soundEnabled ? 'Sound On' : 'Sound Off'}</span>
               </button>
@@ -268,11 +342,11 @@ export default function App() {
               {/* Accessibility Modal Button */}
               <button
                 onClick={() => setIsA11yModalOpen(true)}
-                className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-white text-xs flex items-center gap-1 transition cursor-pointer focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:outline-none"
+                className="h-9 w-9 sm:h-auto sm:w-auto p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-white text-xs flex items-center justify-center gap-1.5 transition cursor-pointer focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:outline-none"
                 title="Blind & Screen Reader Accessibility Guide (Alt+A)"
                 aria-label="Open Accessibility & Keyboard Shortcuts Guide. Keyboard shortcut: Alt plus A."
               >
-                <Eye className="w-4 h-4 text-emerald-400" aria-hidden="true" />
+                <Eye className="w-4 h-4 text-emerald-400 flex-shrink-0" aria-hidden="true" />
                 <span className="hidden sm:inline">Accessibility</span>
               </button>
 
@@ -285,7 +359,7 @@ export default function App() {
       {/* Main Flow Views based on Room State Machine */}
       <main id="main-content" className="flex-1 flex flex-col w-full">
         {status === 'IDLE' && !roomId && (
-          <LandingView onCreateRoom={createRoom} error={error} />
+          <LandingView onCreateRoom={handleCreateRoom} error={error} />
         )}
 
         {status === 'IDLE' && roomId && (
@@ -305,7 +379,7 @@ export default function App() {
               <div role="alert" className="max-w-sm p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs space-y-2 text-center">
                 <p>{error}</p>
                 <button
-                  onClick={resetToLanding}
+                  onClick={handleResetToLanding}
                   className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium cursor-pointer transition focus-visible:ring-2 focus-visible:ring-emerald-400"
                 >
                   Return to Home
@@ -321,6 +395,8 @@ export default function App() {
             roomId={roomId}
             roomData={roomData}
             guestKnocked={guestKnocked}
+            draftMessage={draftMessage}
+            onUpdateDraftMessage={setDraftMessage}
             onOpenDoor={openDoor}
             onKeepDoorClosed={keepDoorClosed}
           />
@@ -349,6 +425,8 @@ export default function App() {
             peerTyping={peerTyping}
             otherParticipantEndedNotice={otherParticipantEndedNotice}
             onUpdateTimer={updateSettings}
+            initialDraftMessage={draftMessage}
+            onClearDraftMessage={() => setDraftMessage('')}
           />
         )}
       </main>
@@ -380,7 +458,24 @@ export default function App() {
         onToggleHighContrast={handleToggleHighContrast}
         hapticEnabled={hapticEnabled}
         onToggleHaptic={handleToggleHaptic}
+        shakeEnabled={shakeEnabled}
+        onToggleShake={handleToggleShake}
+        shakeAction={shakeAction}
+        onChangeShakeAction={handleChangeShakeAction}
+        onTestShakeHaptic={testShakeHaptic}
       />
+
+      {/* Shake Gesture Emergency Toast */}
+      {shakeToast && (
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-2xl bg-zinc-900/95 border-2 border-emerald-500/80 text-zinc-100 shadow-2xl flex items-center gap-2.5 text-xs font-semibold backdrop-blur-md animate-bounce-short pointer-events-none"
+        >
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping flex-shrink-0" aria-hidden="true" />
+          <span>{shakeToast}</span>
+        </div>
+      )}
 
       {/* Network Offline Toast */}
       <OfflineIndicator />

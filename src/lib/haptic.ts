@@ -7,7 +7,8 @@
  * knocks, and room dissolution to empower screen reader and low-vision users.
  */
 
-const HAPTIC_STORAGE_KEY = 'privchat_haptic_enabled';
+const HAPTIC_STORAGE_KEY = 'privachat_haptic_enabled';
+const LEGACY_HAPTIC_STORAGE_KEY = 'privchat_haptic_enabled';
 
 /**
  * Checks if haptic feedback is enabled in local storage.
@@ -16,7 +17,7 @@ const HAPTIC_STORAGE_KEY = 'privchat_haptic_enabled';
 export function isHapticEnabled(): boolean {
   if (typeof window === 'undefined') return false;
   try {
-    const stored = localStorage.getItem(HAPTIC_STORAGE_KEY);
+    const stored = localStorage.getItem(HAPTIC_STORAGE_KEY) ?? localStorage.getItem(LEGACY_HAPTIC_STORAGE_KEY);
     if (stored === null) return true; // default enabled
     return stored === 'true';
   } catch {
@@ -100,6 +101,14 @@ export function hapticShutter(): void {
  */
 export function hapticDestruct(): void {
   triggerHaptic([60, 40, 60, 40, 90]);
+}
+
+/**
+ * Distinct, urgent triple vibration burst confirming a physical device shake
+ * gesture has been detected to end chat or clear history.
+ */
+export function hapticShakeFeedback(): void {
+  triggerHaptic([80, 50, 80, 50, 160]);
 }
 
 /**
