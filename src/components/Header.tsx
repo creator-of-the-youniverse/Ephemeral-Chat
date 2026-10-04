@@ -275,8 +275,8 @@ export const Header: React.FC<HeaderProps> = ({
                     >
                       <Eye className="w-4 h-4 text-emerald-400 flex-shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-zinc-100 text-xs">Accessibility & Guide</div>
-                        <div className="text-[10px] text-zinc-400">High contrast, haptics & voice</div>
+                        <div className="font-semibold text-zinc-100 text-xs">Accessibility & Shortcuts (Alt+A)</div>
+                        <div className="text-[10px] text-zinc-400">High contrast (Alt+C), haptics, voice & shake</div>
                       </div>
                     </button>
 
@@ -508,7 +508,7 @@ export const Header: React.FC<HeaderProps> = ({
             aria-label="Open Accessibility & Keyboard Shortcuts Guide. Keyboard shortcut: Alt plus A."
           >
             <Eye className="w-4 h-4 text-emerald-400 flex-shrink-0" aria-hidden="true" />
-            <span>Accessibility</span>
+            <span>Accessibility (Alt+A)</span>
           </button>
 
           <PWAInstallButton />

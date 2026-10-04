@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { DoorClosed, Shield, User, ArrowRight, Key, MessageSquare } from 'lucide-react';
+import { DoorClosed, Shield, User, ArrowRight, Key, MessageSquare, Eye } from 'lucide-react';
 import { announce } from '../lib/announcer';
 import { PWAInstallPromptBox } from './PWAInstallPromptBox';
 
@@ -63,7 +63,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onCreateRoom, isLoadin
               Private Ephemeral Chat
             </h1>
             <p className="text-sm sm:text-base text-zinc-400 max-w-sm mx-auto leading-relaxed">
-              A temporary room for two. No accounts, no records, and permanently wiped when both leave.
+              A temporary room for two. End-to-end ephemeral, accessible for all users, and permanently wiped when both leave.
             </p>
           </div>
 
@@ -92,10 +92,22 @@ export const LandingView: React.FC<LandingViewProps> = ({ onCreateRoom, isLoadin
                 </span>
               </div>
             </div>
+
+            <div className="p-3.5 rounded-xl bg-zinc-900/80 border border-zinc-800/80 flex items-start gap-3">
+              <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 mt-0.5">
+                <Eye className="w-4 h-4" />
+              </div>
+              <div className="text-xs sm:text-sm">
+                <span className="font-semibold text-zinc-200 block">Accessibility & Screen Reader Ready</span>
+                <span className="text-zinc-400">
+                  Engineered with screen reader live regions, spoken voice guidance, high contrast mode (<kbd className="px-1 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-zinc-300 font-mono text-[10px]">Alt+C</kbd>), tactile haptics (<kbd className="px-1 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-zinc-300 font-mono text-[10px]">Alt+H</kbd>), emergency shake triggers, and battery protection.
+                </span>
+              </div>
+            </div>
           </div>
 
           {/* Primary Action Button */}
-          <div className="pt-2">
+          <div className="pt-2 space-y-2">
             <button
               onClick={handleGoToName}
               className="w-full py-3.5 px-6 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-semibold text-sm sm:text-base transition duration-150 flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-[0.99] cursor-pointer focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:outline-none"
@@ -104,6 +116,9 @@ export const LandingView: React.FC<LandingViewProps> = ({ onCreateRoom, isLoadin
               <span>Open a Private Chat</span>
               <ArrowRight className="w-4 h-4" aria-hidden="true" />
             </button>
+            <p className="text-[11px] text-zinc-500 text-center">
+              Press <kbd className="px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-300 font-mono text-[10px]">Alt+A</kbd> anytime for the full accessibility guide, voice controls, and keyboard shortcuts.
+            </p>
           </div>
 
           {/* In-App Install Prompt Box */}

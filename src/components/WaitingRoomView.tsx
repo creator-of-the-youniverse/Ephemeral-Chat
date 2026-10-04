@@ -155,6 +155,10 @@ export const WaitingRoomView: React.FC<WaitingRoomViewProps> = ({
                 </>
               )}
             </button>
+
+            <p className="text-[11px] text-zinc-500 text-center">
+              Accessible design: Audio earcons and live announcements guide you when the door opens. Press <kbd className="px-1 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-400 font-mono text-[10px]">Alt+A</kbd> for accessibility options.
+            </p>
           </form>
         </div>
       ) : knockDeclined ? (

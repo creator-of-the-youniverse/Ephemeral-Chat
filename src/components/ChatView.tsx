@@ -244,6 +244,11 @@ export const ChatView: React.FC<ChatViewProps> = ({
             <p className="text-xs text-zinc-500 max-w-xs">
               Messages and camera photos exist only in this session and vanish upon completion.
             </p>
+            <div className="pt-2 text-[11px] text-zinc-500 max-w-xs space-y-1">
+              <p>
+                <span className="text-emerald-400/90 font-medium">Accessibility:</span> Tap any message for timestamps. Press <kbd className="px-1 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-400 font-mono text-[10px]">Alt+A</kbd> for shortcuts, <kbd className="px-1 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-400 font-mono text-[10px]">Alt+C</kbd> for high contrast.
+              </p>
+            </div>
           </div>
         ) : (
           roomData.messages.map((msg) => {

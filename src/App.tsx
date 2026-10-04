@@ -354,7 +354,7 @@ export default function App() {
                 aria-label="Open Accessibility & Keyboard Shortcuts Guide. Keyboard shortcut: Alt plus A."
               >
                 <Eye className="w-4 h-4 text-emerald-400 flex-shrink-0" aria-hidden="true" />
-                <span className="hidden sm:inline">Accessibility</span>
+                <span className="hidden sm:inline">Accessibility (Alt+A)</span>
               </button>
 
               <PWAInstallButton />

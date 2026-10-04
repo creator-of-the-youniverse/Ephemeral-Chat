@@ -283,6 +283,16 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
             <span className="w-2 h-2 rounded-full bg-emerald-500/50 animate-pulse" aria-hidden="true" />
             <span>Waiting for the other person to knock...</span>
           </div>
+
+          {/* Accessibility Cues & Shortcut Helper */}
+          <div className="pt-2 text-[11px] text-zinc-500 text-center space-y-1">
+            <p>
+              A double-knock chime and screen reader alert will play automatically when your guest knocks.
+            </p>
+            <p className="text-[10px] text-zinc-600">
+              Shortcuts: <kbd className="px-1 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-400 font-mono">Alt+A</kbd> accessibility • <kbd className="px-1 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-400 font-mono">Alt+C</kbd> high contrast • <kbd className="px-1 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-400 font-mono">Alt+S</kbd> sounds
+            </p>
+          </div>
         </div>
       )}
     </div>
