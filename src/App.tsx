@@ -15,6 +15,7 @@ import { DestroyedNotice } from './components/DestroyedNotice';
 import { BiometricLockModal } from './components/BiometricLockModal';
 import { AccessibilityModal } from './components/AccessibilityModal';
 import { OfflineIndicator, PWAInstallButton, usePWAInstall } from './components/PWAInstallButton';
+import { PWAInstallPromptBox } from './components/PWAInstallPromptBox';
 import { isSoundEnabled, setSoundEnabled } from './lib/sound';
 import { isVoicePromptsEnabled, setVoicePromptsEnabled, speakVoicePrompt } from './lib/speech';
 import { isHighContrastEnabled, setHighContrastEnabled } from './lib/highContrast';
@@ -235,7 +236,7 @@ export default function App() {
   const otherName = isHost ? roomData?.guestName || 'Guest' : roomData?.hostName || 'Host';
 
   // Render Destroyed / Closed screen
-  if (bothEndedNotice || (status === 'DESTROYED' && !roomData)) {
+  if (bothEndedNotice || status === 'DESTROYED') {
     return (
       <main className="min-h-[100dvh] w-full bg-zinc-950 text-zinc-100 flex flex-col items-center justify-center">
         {/* Skip to Content */}
@@ -429,6 +430,25 @@ export default function App() {
             onClearDraftMessage={() => setDraftMessage('')}
           />
         )}
+        {/* Fallback view if room is initializing or in transition */}
+        {!(status === 'IDLE' && !roomId) &&
+         !(status === 'IDLE' && roomId) &&
+         !(isHost && (status === 'WAITING_FOR_GUEST' || status === 'GUEST_KNOCKED') && roomId) &&
+         !(!isHost && (status === 'WAITING_FOR_GUEST' || status === 'GUEST_KNOCKED')) &&
+         !((status === 'ACTIVE' || status === 'ENDED') && roomData && role) && (
+          <div className="flex-1 flex flex-col items-center justify-center p-6 text-center space-y-4 my-auto">
+            <div className="w-14 h-14 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-emerald-400 shadow-xl">
+              <span className="w-6 h-6 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+            </div>
+            <p className="text-sm text-zinc-300">Loading private chat room...</p>
+            <button
+              onClick={handleResetToLanding}
+              className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs text-zinc-300 transition cursor-pointer"
+            >
+              Return to PrivaChat
+            </button>
+          </div>
+        )}
       </main>
 
       {/* End Chat Confirmation Modal */}
@@ -464,6 +484,9 @@ export default function App() {
         onChangeShakeAction={handleChangeShakeAction}
         onTestShakeHaptic={testShakeHaptic}
       />
+
+      {/* In-App Floating Install Prompt Box (Prompts uninstalled users) */}
+      <PWAInstallPromptBox variant="banner" />
 
       {/* Shake Gesture Emergency Toast */}
       {shakeToast && (

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { announce } from '../lib/announcer';
 import { playDoorKnock } from '../lib/sound';
 import { triggerHaptic } from '../lib/haptic';
+import { safeGetLocalStorage, safeSetLocalStorage, safeRemoveLocalStorage } from '../lib/safeStorage';
 
 export interface BatteryState {
   isSupported: boolean;
@@ -15,10 +16,10 @@ const SIMULATED_BATTERY_KEY = 'privachat_simulated_battery';
 export function simulateBatteryLevel(level: number | null): void {
   if (typeof window === 'undefined') return;
   if (level === null) {
-    localStorage.removeItem(SIMULATED_BATTERY_KEY);
+    safeRemoveLocalStorage(SIMULATED_BATTERY_KEY);
     window.dispatchEvent(new CustomEvent('privachat:battery-change', { detail: null }));
   } else {
-    localStorage.setItem(SIMULATED_BATTERY_KEY, String(level));
+    safeSetLocalStorage(SIMULATED_BATTERY_KEY, String(level));
     window.dispatchEvent(new CustomEvent('privachat:battery-change', { detail: { level, charging: false } }));
   }
 }
@@ -26,7 +27,7 @@ export function simulateBatteryLevel(level: number | null): void {
 export function useBattery(): BatteryState {
   const [batteryState, setBatteryState] = useState<BatteryState>(() => {
     if (typeof window !== 'undefined') {
-      const simulated = localStorage.getItem(SIMULATED_BATTERY_KEY);
+      const simulated = safeGetLocalStorage(SIMULATED_BATTERY_KEY);
       if (simulated !== null) {
         const level = parseInt(simulated, 10);
         if (!isNaN(level)) {
@@ -95,7 +96,7 @@ export function useBattery(): BatteryState {
     window.addEventListener('privachat:battery-change', handleSimulationEvent);
 
     const initHardwareBattery = () => {
-      const simulated = localStorage.getItem(SIMULATED_BATTERY_KEY);
+      const simulated = safeGetLocalStorage(SIMULATED_BATTERY_KEY);
       if (simulated !== null) {
         const level = parseInt(simulated, 10);
         if (!isNaN(level)) {

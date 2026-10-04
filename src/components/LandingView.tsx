@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { DoorClosed, Shield, User, ArrowRight, Key, MessageSquare } from 'lucide-react';
 import { announce } from '../lib/announcer';
+import { safeGetLocalStorage, safeSetLocalStorage } from '../lib/safeStorage';
+import { PWAInstallPromptBox } from './PWAInstallPromptBox';
 
 interface LandingViewProps {
   onCreateRoom: (hostName: string, draftMessage?: string) => Promise<string>;
@@ -15,7 +17,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onCreateRoom, isLoadin
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(() => {
-    return localStorage.getItem('privachat_onboarding_seen') !== 'true' && localStorage.getItem('privchat_onboarding_seen') !== 'true';
+    return safeGetLocalStorage('privachat_onboarding_seen') !== 'true' && safeGetLocalStorage('privchat_onboarding_seen') !== 'true';
   });
 
   useEffect(() => {
@@ -47,7 +49,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onCreateRoom, isLoadin
   };
 
   const closeOnboarding = () => {
-    localStorage.setItem("privachat_onboarding_seen", "true");
+    safeSetLocalStorage("privachat_onboarding_seen", "true");
     setShowOnboarding(false);
   };
   return (
@@ -112,6 +114,11 @@ export const LandingView: React.FC<LandingViewProps> = ({ onCreateRoom, isLoadin
               <span>Open a Private Chat</span>
               <ArrowRight className="w-4 h-4" aria-hidden="true" />
             </button>
+          </div>
+
+          {/* In-App Install Prompt Box */}
+          <div className="pt-2">
+            <PWAInstallPromptBox variant="card" />
           </div>
         </div>
       ) : (

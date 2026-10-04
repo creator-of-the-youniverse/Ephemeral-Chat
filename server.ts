@@ -785,6 +785,19 @@ async function startServer() {
   const indexHtmlPath = path.join(distPath, 'index.html');
   const hasDist = fs.existsSync(indexHtmlPath);
 
+  // Serve static assets from dist if they exist so cached PWA clients get actual JS/CSS
+  if (hasDist) {
+    app.use('/assets', express.static(path.join(distPath, 'assets'), {
+      maxAge: '1y',
+      immutable: true,
+    }));
+  }
+
+  // Prevent asset requests from ever returning HTML fallback (which crashes browsers with SyntaxError)
+  app.use('/assets/*', (req, res) => {
+    res.status(404).type('text/plain').send('Asset not found');
+  });
+
   if (!isProduction) {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
