@@ -785,17 +785,37 @@ async function startServer() {
   const indexHtmlPath = path.join(distPath, 'index.html');
   const hasDist = fs.existsSync(indexHtmlPath);
 
-  // Serve static assets from dist if they exist so cached PWA clients get actual JS/CSS
+  // Serve static assets from dist if they exist (service worker, workbox runtime, icons, bundled assets)
   if (hasDist) {
+    app.get('/sw.js', (req, res) => {
+      res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.sendFile(path.join(distPath, 'sw.js'));
+    });
+
+    app.get('/workbox-*.js', (req, res) => {
+      res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      const filename = path.basename(req.path);
+      const filePath = path.join(distPath, filename);
+      if (fs.existsSync(filePath)) {
+        return res.sendFile(filePath);
+      }
+      res.status(404).type('text/plain').send('Workbox script not found');
+    });
+
     app.use('/assets', express.static(path.join(distPath, 'assets'), {
       maxAge: '1y',
       immutable: true,
     }));
   }
 
-  // Prevent asset requests from ever returning HTML fallback (which crashes browsers with SyntaxError)
-  app.use('/assets/*', (req, res) => {
-    res.status(404).type('text/plain').send('Asset not found');
+  // Prevent asset/script requests from ever returning HTML fallback (which crashes browsers with SyntaxError)
+  app.get(['*.js', '*.css', '/assets/*'], (req, res, next) => {
+    if (req.path.startsWith('/src/') || req.path.startsWith('/node_modules/') || req.path.startsWith('/@')) {
+      return next();
+    }
+    res.status(404).type('text/plain').send('Resource not found');
   });
 
   if (!isProduction) {

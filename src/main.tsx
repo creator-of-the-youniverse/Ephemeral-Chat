@@ -8,19 +8,21 @@ import './index.css';
 // Manage PWA service worker lifecycle
 if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
   if (import.meta.env.PROD) {
-    try {
-      registerSW({
-        immediate: true,
-        onNeedRefresh() {
-          console.log('PrivaChat update available.');
-        },
-        onOfflineReady() {
-          console.log('PrivaChat ready offline.');
-        },
-      });
-    } catch (err) {
-      console.warn('PWA service worker registration notice:', err);
-    }
+    window.addEventListener('load', () => {
+      try {
+        registerSW({
+          immediate: false,
+          onNeedRefresh() {
+            console.log('PrivaChat update available.');
+          },
+          onOfflineReady() {
+            console.log('PrivaChat ready offline.');
+          },
+        });
+      } catch (err) {
+        console.warn('PWA service worker registration notice:', err);
+      }
+    });
   } else {
     // In development mode, unregister any stale service workers to prevent cached bundle conflicts
     navigator.serviceWorker.getRegistrations().then((registrations) => {
