@@ -3,6 +3,7 @@ import { Send, Timer, Shield, Info, AlertTriangle, Clock, Camera, EyeOff, Lock }
 import { RoomData, Message } from '../types';
 import { CameraCaptureModal } from './CameraCaptureModal';
 import { EphemeralImageModal } from './EphemeralImageModal';
+import { hapticTap } from '../lib/haptic';
 
 interface ChatViewProps {
   roomData: RoomData;
@@ -40,9 +41,39 @@ export const ChatView: React.FC<ChatViewProps> = ({
   const [now, setNow] = useState(Date.now());
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [activeImageModal, setActiveImageModal] = useState<Message | null>(null);
+  const [activeTimestampMessageId, setActiveTimestampMessageId] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const timestampTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Clear ephemeral timestamp timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (timestampTimeoutRef.current) {
+        clearTimeout(timestampTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleToggleMessageTimestamp = (messageId: string) => {
+    hapticTap();
+    if (activeTimestampMessageId === messageId) {
+      setActiveTimestampMessageId(null);
+      if (timestampTimeoutRef.current) {
+        clearTimeout(timestampTimeoutRef.current);
+      }
+    } else {
+      setActiveTimestampMessageId(messageId);
+      if (timestampTimeoutRef.current) {
+        clearTimeout(timestampTimeoutRef.current);
+      }
+      // Ephemeral: softly auto-hide timestamp after 4.5 seconds to preserve minimalist view
+      timestampTimeoutRef.current = setTimeout(() => {
+        setActiveTimestampMessageId((current) => (current === messageId ? null : current));
+      }, 4500);
+    }
+  };
 
   const isHost = role === 'host';
   const myEnded = isHost ? roomData.hostEnded : roomData.guestEnded;
@@ -235,23 +266,24 @@ export const ChatView: React.FC<ChatViewProps> = ({
                 key={msg.id}
                 tabIndex={0}
                 aria-label={accessibleLabel}
-                className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} space-y-1 animate-fade-in focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:outline-none rounded-2xl p-1`}
+                className={`flex flex-col ${isMe ? 'items-end animate-message-me' : 'items-start animate-message-peer'} space-y-1 focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:outline-none rounded-2xl p-1`}
               >
-                {/* Sender Name & Timestamp */}
-                <div className="flex items-center gap-1.5 px-1 text-[11px] text-zinc-500" aria-hidden="true">
-                  <span className={`font-medium ${isMe ? 'text-emerald-400/90' : 'text-zinc-400'}`}>
-                    {isMe ? 'You' : msg.senderName}
-                  </span>
-                  <span>•</span>
-                  <span>{timeStr}</span>
-
-                  {remainingSeconds !== null && (
-                    <span className="flex items-center gap-0.5 text-amber-400 font-mono text-[10px] ml-1 bg-amber-500/10 px-1.5 py-0.5 rounded">
-                      <Clock className="w-2.5 h-2.5" />
-                      {remainingSeconds}s
-                    </span>
-                  )}
-                </div>
+                {/* Sender Name & Countdown badge (if active) */}
+                {(!isMe || remainingSeconds !== null) && (
+                  <div className="flex items-center gap-1.5 px-1 text-[11px] text-zinc-500" aria-hidden="true">
+                    {!isMe && (
+                      <span className="font-medium text-zinc-400">
+                        {msg.senderName}
+                      </span>
+                    )}
+                    {remainingSeconds !== null && (
+                      <span className="flex items-center gap-0.5 text-amber-400 font-mono text-[10px] bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+                        <Clock className="w-2.5 h-2.5" />
+                        {remainingSeconds}s
+                      </span>
+                    )}
+                  </div>
+                )}
 
                 {/* Message Bubble: Image vs Text */}
                 {msg.messageType === 'image' && msg.imageData ? (
@@ -299,22 +331,70 @@ export const ChatView: React.FC<ChatViewProps> = ({
                       </div>
                     </button>
 
-                    {msg.text && (
-                      <p className="text-xs px-1 text-zinc-200 break-words leading-relaxed">
+                    {msg.text ? (
+                      <button
+                        type="button"
+                        onClick={() => handleToggleMessageTimestamp(msg.id)}
+                        className="w-full text-left text-xs px-1 text-zinc-200 break-words leading-relaxed cursor-pointer hover:text-white transition"
+                        aria-label="Tap to toggle photo timestamp"
+                      >
                         <span className="sr-only">Photo description: </span>
                         {msg.text}
-                      </p>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleToggleMessageTimestamp(msg.id)}
+                        className="text-[10px] text-zinc-400 hover:text-zinc-300 px-1 py-0.5 flex items-center gap-1 cursor-pointer transition select-none"
+                        aria-label="Tap to toggle photo timestamp"
+                      >
+                        <Clock className="w-2.5 h-2.5 opacity-60" aria-hidden="true" />
+                        <span>Tap for time</span>
+                      </button>
                     )}
                   </div>
                 ) : (
                   <div
-                    className={`max-w-[85%] sm:max-w-[75%] px-4 py-2.5 rounded-2xl text-sm break-words whitespace-pre-wrap leading-relaxed shadow-sm ${
+                    role="button"
+                    tabIndex={0}
+                    aria-expanded={activeTimestampMessageId === msg.id}
+                    aria-label={`${isMe ? 'Your message' : `Message from ${msg.senderName}`}: ${msg.text}. Tap to toggle timestamp.`}
+                    onClick={() => handleToggleMessageTimestamp(msg.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleToggleMessageTimestamp(msg.id);
+                      }
+                    }}
+                    className={`max-w-[85%] sm:max-w-[75%] px-4 py-2.5 rounded-2xl text-sm break-words whitespace-pre-wrap leading-relaxed shadow-sm cursor-pointer select-none active:scale-[0.99] transition-all focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:outline-none ${
                       isMe
-                        ? 'chat-bubble-me bg-emerald-600 text-white rounded-tr-xs'
-                        : 'chat-bubble-peer bg-zinc-800 text-zinc-100 rounded-tl-xs border border-zinc-700/60'
+                        ? 'chat-bubble-me bg-emerald-600 text-white rounded-tr-xs hover:bg-emerald-500/95'
+                        : 'chat-bubble-peer bg-zinc-800 text-zinc-100 rounded-tl-xs border border-zinc-700/60 hover:bg-zinc-750'
                     }`}
                   >
                     {msg.text}
+                  </div>
+                )}
+
+                {/* Subtle Ephemeral Timestamp (Revealed only when user taps the bubble) */}
+                {activeTimestampMessageId === msg.id && (
+                  <div
+                    role="status"
+                    aria-live="polite"
+                    className={`flex items-center gap-1.5 px-2 py-0.5 text-[11px] text-zinc-400 contrast-more:text-zinc-200 select-none animate-fade-in font-mono tracking-tight ${
+                      isMe ? 'justify-end' : 'justify-start'
+                    }`}
+                  >
+                    <Clock className="w-2.5 h-2.5 text-zinc-500 flex-shrink-0" aria-hidden="true" />
+                    <span>{timeStr}</span>
+                    {remainingSeconds !== null && (
+                      <>
+                        <span className="text-zinc-600" aria-hidden="true">•</span>
+                        <span className="text-amber-400/90 font-sans text-[10px] bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+                          dissolves in {remainingSeconds}s
+                        </span>
+                      </>
+                    )}
                   </div>
                 )}
               </article>

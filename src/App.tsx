@@ -16,6 +16,7 @@ import { BiometricLockModal } from './components/BiometricLockModal';
 import { AccessibilityModal } from './components/AccessibilityModal';
 import { OfflineIndicator, PWAInstallButton, usePWAInstall } from './components/PWAInstallButton';
 import { PWAInstallPromptBox } from './components/PWAInstallPromptBox';
+import { registerAppServiceWorker } from './lib/registerServiceWorker';
 import { isSoundEnabled, setSoundEnabled } from './lib/sound';
 import { isVoicePromptsEnabled, setVoicePromptsEnabled, speakVoicePrompt } from './lib/speech';
 import { isHighContrastEnabled, setHighContrastEnabled } from './lib/highContrast';
@@ -175,6 +176,11 @@ export default function App() {
     const msg = `Shake gesture action set to: ${actionLabel}.`;
     announce(msg, 'polite');
     speakVoicePrompt(msg);
+  }, []);
+
+  // Register PWA Service Worker strictly after the initial React render is complete
+  useEffect(() => {
+    registerAppServiceWorker();
   }, []);
 
   // Global Keyboard Shortcuts for complete blind accessibility:

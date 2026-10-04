@@ -190,3 +190,49 @@ html.high-contrast *:focus-visible {
   outline: 3px solid #ffffff !important;
   outline-offset: 3px !important;
 }
+
+/* ==========================================================================
+   Gentle Ephemeral Message Entrance Animations
+   Adds a whisper-soft, floating entrance as messages appear in the feed.
+   ========================================================================== */
+@keyframes message-entrance-me {
+  0% {
+    opacity: 0;
+    transform: translate3d(4px, 10px, 0) scale(0.97);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes message-entrance-peer {
+  0% {
+    opacity: 0;
+    transform: translate3d(-4px, 10px, 0) scale(0.97);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+.animate-message-me {
+  animation: message-entrance-me 280ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: transform, opacity;
+}
+
+.animate-message-peer {
+  animation: message-entrance-peer 280ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: transform, opacity;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-message-me,
+  .animate-message-peer {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
