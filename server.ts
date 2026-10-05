@@ -147,7 +147,12 @@ setInterval(() => {
 
 async function startServer() {
   const app = express();
-  const PORT = Number(process.env.PORT) || 3000;
+  // Dev server in container must always bind to port 3000 (Nginx listens on 8080 and proxies to 3000)
+  // Check CLI arguments (--port 3000) or APP_PORT or default 3000 (ignoring Cloud Run's outer PORT 8080)
+  const portArgIndex = process.argv.findIndex((arg) => arg === '--port' || arg === '-p');
+  const cliPort = portArgIndex !== -1 && process.argv[portArgIndex + 1] ? Number(process.argv[portArgIndex + 1]) : null;
+  const envPort = process.env.PORT && process.env.PORT !== '8080' ? Number(process.env.PORT) : null;
+  const PORT = cliPort || envPort || Number(process.env.APP_PORT) || 3000;
 
   app.use(express.json({ limit: '20mb' }));
   app.use(express.urlencoded({ extended: true, limit: '20mb' }));
@@ -783,39 +788,28 @@ async function startServer() {
   const isProduction = process.env.NODE_ENV === 'production';
   const distPath = path.resolve(process.cwd(), 'dist');
   const indexHtmlPath = path.join(distPath, 'index.html');
-  const hasDist = fs.existsSync(indexHtmlPath);
 
-  // Serve static assets from dist if they exist (service worker, workbox runtime, icons, bundled assets)
-  if (hasDist) {
-    app.get('/sw.js', (req, res) => {
-      res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
-      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-      res.sendFile(path.join(distPath, 'sw.js'));
-    });
+  // Dynamically serve service worker and workbox scripts
+  app.get('/sw.js', (req, res) => {
+    const swPath = path.join(distPath, 'sw.js');
+    res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    if (fs.existsSync(swPath)) {
+      return res.sendFile(swPath);
+    }
+    // Return lightweight no-op service worker in dev if dist hasn't been built yet
+    res.send('// PrivaChat development service worker\nself.addEventListener("install", () => self.skipWaiting());\nself.addEventListener("activate", () => self.clients.claim());');
+  });
 
-    app.get('/workbox-*.js', (req, res) => {
+  app.get('/workbox-*.js', (req, res) => {
+    const filename = path.basename(req.path);
+    const filePath = path.join(distPath, filename);
+    if (fs.existsSync(filePath)) {
       res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
       res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-      const filename = path.basename(req.path);
-      const filePath = path.join(distPath, filename);
-      if (fs.existsSync(filePath)) {
-        return res.sendFile(filePath);
-      }
-      res.status(404).type('text/plain').send('Workbox script not found');
-    });
-
-    app.use('/assets', express.static(path.join(distPath, 'assets'), {
-      maxAge: '1y',
-      immutable: true,
-    }));
-  }
-
-  // Prevent asset/script requests from ever returning HTML fallback (which crashes browsers with SyntaxError)
-  app.get(['*.js', '*.css', '/assets/*'], (req, res, next) => {
-    if (req.path.startsWith('/src/') || req.path.startsWith('/node_modules/') || req.path.startsWith('/@')) {
-      return next();
+      return res.sendFile(filePath);
     }
-    res.status(404).type('text/plain').send('Resource not found');
+    res.status(404).type('text/plain').send('Workbox script not found');
   });
 
   if (!isProduction) {
@@ -829,7 +823,7 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    if (hasDist) {
+    if (fs.existsSync(indexHtmlPath)) {
       app.use(express.static(distPath));
       app.get('*', (req, res, next) => {
         if (req.path.startsWith('/api') || req.path.startsWith('/ws')) {
@@ -843,6 +837,11 @@ async function startServer() {
       });
     }
   }
+
+  // Prevent any unhandled asset/script requests from returning HTML fallback
+  app.get(['*.js', '*.css', '/assets/*'], (req, res) => {
+    res.status(404).type('text/plain').send('Resource not found');
+  });
 
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`Ephemeral PWA Server running on port ${PORT}`);
